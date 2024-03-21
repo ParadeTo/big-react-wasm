@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+    "packages/react",
+    "packages/react-dom",
+#    "packages/react-reconciler",
+    "packages/shared"
+]
