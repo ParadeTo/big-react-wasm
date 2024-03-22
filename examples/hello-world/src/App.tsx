@@ -1,10 +1,11 @@
-
+import dayjs from "dayjs";
 
 
 function App() {
-  return (
-      <div>a</div>
-  )
+    console.log(dayjs().format())
+    return (
+        <div>a</div>
+    )
 }
 
 export default App
