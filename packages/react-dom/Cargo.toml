@@ -14,6 +14,8 @@ default = ["console_error_panic_hook"]
 wasm-bindgen = "0.2.84"
 web-sys = {  version = "0.3.69", features = ["console"] }
 react-reconciler = { path = "../react-reconciler" }
+react = { path = "../react" }
+shared = { path = "../shared" }
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for

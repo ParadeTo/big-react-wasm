@@ -68,6 +68,7 @@ name = "react"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "serde-wasm-bindgen",
  "shared",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -79,7 +80,9 @@ name = "react-dom"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "react",
  "react-reconciler",
+ "shared",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
@@ -91,6 +94,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "react",
+ "shared",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
@@ -101,6 +105,37 @@ name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
+
+[[package]]
+name = "serde"
+version = "1.0.197"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fb1c873e1b9b056a4dc4c0c198b24c3ffa059243875552b2bd0933b1aee4ce2"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.197"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7eb0b34b42edc17f6b7cac84a52a1c5f0e1bb2227e997ca9011ea3dd34e8610b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "shared"
