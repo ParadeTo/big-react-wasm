@@ -4,9 +4,6 @@ use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 
-use react::ReactElement;
-use shared::log;
-
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::update_queue::{create_update, enqueue_update};
 use crate::work_tags::WorkTag;
@@ -30,12 +27,8 @@ pub fn create_container(container: &JsValue) -> Rc<RefCell<FiberRootNode>> {
     root.clone()
 }
 
-pub fn update_container(element: &ReactElement, root: Ref<FiberRootNode>) {
-    log!("{:?}, {:?}", element, root);
-    let update = create_update(JsValue::);
+pub fn update_container(element: Rc<JsValue>, root: Ref<FiberRootNode>) {
+    let update = create_update(element);
     enqueue_update(root.current.borrow(), update);
-    // let host_root_fiber = root();
-
-    // let update = create_update
 }
 

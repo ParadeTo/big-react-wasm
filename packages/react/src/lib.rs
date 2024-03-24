@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use web_sys::js_sys;
-use web_sys::js_sys::{Object, Reflect};
+use web_sys::js_sys::{Function, Object, Reflect};
 
 use shared::REACT_ELEMENT_TYPE;
 
@@ -26,8 +26,20 @@ pub struct ReactElement {
 }
 
 impl ReactElement {
-    fn new(_type: Rc<JsValue>, key: Option<String>, _ref: Option<JsValue>, props: Rc<HashMap<String, JsValue>>) -> Self {
-        Self { _typeof: REACT_ELEMENT_TYPE, _type, key, _ref, props, __mark: MARK.to_string() }
+    fn new(
+        _type: Rc<JsValue>,
+        key: Option<String>,
+        _ref: Option<JsValue>,
+        props: Rc<HashMap<String, JsValue>>,
+    ) -> Self {
+        Self {
+            _typeof: REACT_ELEMENT_TYPE,
+            _type,
+            key,
+            _ref,
+            props,
+            __mark: MARK.to_string(),
+        }
     }
 }
 
@@ -57,14 +69,12 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> ReactElement {
         }
     }
 
+    let a = _type.dyn_ref::<Function>();
+    if a.is_some() {
+        let this = JsValue::null();
+        &a.unwrap().call0(&this).unwrap();
+    } else {
+    }
 
-    // let a = _type.dyn_ref::<Function>();
-    // if a.is_some() {
-    //     let this = JsValue::null();
-    //     console::log_1(&a.unwrap().call0(&this).unwrap());
-    // } else {
-    //     let a = _type.dyn_ref::<JsString>();
-    //     console::log_1(a.unwrap());
-    // }
     ReactElement::new(Rc::new(_type.clone()), key, _ref, Rc::new(props))
 }

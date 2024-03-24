@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum WorkTag {
     FunctionComponent = 0,
     HostRoot = 3,
