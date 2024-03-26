@@ -24,6 +24,7 @@ pub struct UpdateQueue {
     pub shared: UpdateType,
 }
 
+
 pub fn create_update(action: Rc<JsValue>) -> Update {
     Update { action: Some(action) }
 }

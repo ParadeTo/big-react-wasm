@@ -20,15 +20,15 @@ extern "C" {
 
 
 pub fn create_container(container: &JsValue) -> Rc<RefCell<FiberRootNode>> {
-    let mut host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot)));
+    let mut host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot, &JsValue::null(), None)));
     let root = Rc::new(RefCell::new(FiberRootNode::new(Box::new(container.clone()), host_root_fiber.clone())));
     let r1 = root.clone();
-    host_root_fiber.borrow_mut().state_node = Some(StateNode::FiberRootNode(Rc::downgrade(&r1)));
+    host_root_fiber.borrow_mut().state_node = Some(StateNode::FiberRootNode(r1));
     root.clone()
 }
 
 pub fn update_container(element: Rc<JsValue>, root: Ref<FiberRootNode>) {
     let update = create_update(element);
-    enqueue_update(root.current.borrow(), update);
+    enqueue_update(root.current.upgrade().unwrap().borrow(), update);
 }
 

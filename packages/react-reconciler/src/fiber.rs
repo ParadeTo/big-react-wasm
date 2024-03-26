@@ -1,18 +1,28 @@
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
+use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
 
-use crate::update_queue::{Update, UpdateQueue, UpdateType};
+use crate::update_queue::{Update, UpdateQueue, UpdateQueueTrait, UpdateType};
 use crate::work_tags::WorkTag;
 
 trait Node {}
 
-static let work_in_progress;
+static mut WORK_IN_PROGRESS: Option<Weak<RefCell<FiberNode>>> = None;
 
 #[derive(Debug, Clone)]
 pub enum StateNode {
     FiberRootNode(Rc<RefCell<FiberRootNode>>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Flags {
+    NoFlags = 0b00000000000000000000000000,
+    Placement = 0b00000000000000000000000010,
+    Update = 0b00000000000000000000000100,
+    Deletion = 0b00000000000000000000001000,
 }
 
 #[derive(Debug, Clone)]
@@ -21,11 +31,15 @@ pub struct FiberNode {
     pending_props: Option<JsValue>,
     key: Option<String>,
     pub state_node: Option<StateNode>,
-    pub update_queue: Option<Box<UpdateQueue>>,
+    pub update_queue: Option<Weak<RefCell<UpdateQueue>>>,
     _return: Option<Weak<RefCell<FiberNode>>>,
     sibling: Option<Rc<RefCell<FiberNode>>>,
     child: Option<Rc<RefCell<FiberNode>>>,
-    alternate: Option<Weak<RefCell<dyn Node>>>,
+    alternate: Option<Weak<RefCell<FiberNode>>>,
+    _type: JsValue,
+    flags: Flags,
+    memoized_props: JsValue,
+    memoized_state: JsValue,
 }
 
 impl Node for FiberNode {}
@@ -42,6 +56,10 @@ impl FiberNode {
             sibling: None,
             child: None,
             alternate: None,
+            _type: JsValue::null(),
+            memoized_props: JsValue::null(),
+            memoized_state: JsValue::null(),
+            flags: Flags::NoFlags,
         }
     }
 
@@ -50,7 +68,10 @@ impl FiberNode {
             None => {
                 return;
             }
-            Some(a) => (**a).clone(),
+            Some(a) => {
+                let b = a.upgrade().clone().unwrap().borrow();
+                b
+            }
         };
 
         let mut u = &mut update_queue;
@@ -58,16 +79,16 @@ impl FiberNode {
     }
 
     pub fn initialize_update_queue(&mut self) {
-        self.update_queue = Some(Box::new(UpdateQueue {
+        self.update_queue = Some(Rc::downgrade(&Rc::new(RefCell::new((UpdateQueue {
             shared: UpdateType {
                 pending: Update { action: None },
             },
-        }))
+        })))));
     }
 
     pub fn schedule_update_on_fiber(fiber: Rc<RefCell<FiberNode>>) {
         let root = FiberNode::mark_update_lane_from_fiber_to_root(fiber);
-        if root == None {
+        if root.is_none() {
             return;
         }
     }
@@ -87,6 +108,7 @@ impl FiberNode {
         }
 
         let node = Rc::clone(&node).borrow();
+        let a = Rc::clone(&node).borrow().deref();
         if node.tag == WorkTag::HostRoot {
             match Rc::clone(&node).borrow().state_node {
                 None => {}
@@ -102,39 +124,25 @@ impl FiberNode {
     }
 
     pub fn create_work_in_progress(current: Rc<RefCell<FiberNode>>, pending_props: &JsValue) -> Weak<RefCell<FiberNode>> {
-        // let w = self.alternate.as_ref();
-        // let mut wip: FiberNode = FiberNode
-        // if w.is_none() {
-        //     wip = self.clone();
-        // }
-
-        let mut wip = Rc::clone(&current).borrow().clone();
-        wip.alternate = Some(Rc::downgrade(&current));
-        let wip = Rc::downgrade(&Rc::new(RefCell::new(wip)));
-        Rc::clone(&current).borrow_mut().alternate = Some(wip);
-        wip
-        // wip
-        // if (wip === null) {
-        //     // mount
-        //     wip = new FiberNode(current.tag, pendingProps, current.key);
-        //     wip.type = current.type;
-        //     wip.stateNode = current.stateNode;
-        //
-        //     wip.alternate = current;
-        //     current.alternate = wip;
-        // } else {
-        //     // update
-        //     wip.pendingProps = pendingProps;
-        // }
-        // wip.updateQueue = current.updateQueue;
-        // wip.flags = current.flags;
-        // wip.child = current.child;
-        //
-        // // 数据
-        // wip.memoizedProps = current.memoizedProps;
-        // wip.memoizedState = current.memoizedState;
-        //
-        // return wip;
+        let c = Rc::clone(&current).borrow().deref();
+        let w = c.alternate.as_ref();
+        if w.is_none() {
+            let mut fiberNode = Rc::clone(&current).borrow_mut();
+            let mut wip = fiberNode.clone();
+            wip.alternate = Some(Rc::downgrade(&current));
+            let wipRc = Rc::new(RefCell::new(wip));
+            fiberNode.alternate = Some(Rc::downgrade(&wipRc));
+            return Rc::downgrade(&wipRc);
+        } else {
+            let mut wip = w.unwrap().upgrade().unwrap().borrow_mut().clone();
+            wip.pending_props = Some(pending_props.clone());
+            wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
+            wip.flags = c.flags.clone();
+            wip.child = Some(Rc::clone(c.child.as_ref().unwrap()));
+            wip.memoized_props = c.memoized_props.clone();
+            wip.memoized_state = c.memoized_state.clone();
+            return Rc::downgrade(&Rc::new(RefCell::new(wip)));
+        }
     }
 }
 
@@ -158,7 +166,15 @@ impl FiberRootNode {
         self.perform_sync_work_on_root();
     }
 
-    fn perform_sync_work_on_root(&self) {}
+    fn perform_sync_work_on_root(&self) {
+        self.prepare_fresh_stack();
 
-    fn prepare_fresh_stack(&self) {}
+        loop {}
+    }
+
+    fn work_loop(&self) {}
+
+    fn prepare_fresh_stack(&self) {
+        unsafe { WORK_IN_PROGRESS = Some(FiberNode::create_work_in_progress(self.current.upgrade().unwrap(), &JsValue::null())); }
+    }
 }
