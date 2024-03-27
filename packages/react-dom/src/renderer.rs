@@ -1,11 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::wasm_bindgen;
 
+use react::ReactElement;
 use react_reconciler::fiber::FiberRootNode;
-use react_reconciler::update_container;
+use shared::log;
 
 #[wasm_bindgen]
 pub struct Renderer {
@@ -22,6 +24,8 @@ impl Renderer {
 #[wasm_bindgen]
 impl Renderer {
     pub fn render(&self, element: &JsValue) {
-        update_container(Rc::new(element.clone()), self.root.borrow())
+        let element = ReactElement::from_js_value(element);
+        log!("{:?}", element);
+        // update_container(Rc::new(element.clone()), self.root.borrow())
     }
 }

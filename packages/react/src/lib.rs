@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use web_sys::js_sys;
-use web_sys::js_sys::{Function, Object, Reflect};
+use web_sys::js_sys::{Object, Reflect};
 
-use shared::REACT_ELEMENT_TYPE;
+use shared::{log, REACT_ELEMENT_TYPE};
 
 use crate::utils::set_panic_hook;
 
@@ -41,6 +41,47 @@ impl ReactElement {
             __mark: MARK.to_string(),
         }
     }
+
+    pub fn from_js_value(js_value: &JsValue) {
+        log!("{:?}", js_value.dyn_ref::<Object>().unwrap());
+        for prop in js_sys::Object::keys(js_value.dyn_ref::<Object>().unwrap()) {
+            let val = Reflect::get(&js_value, &prop);
+            match prop.as_string() {
+                None => {}
+                Some(k) => {
+                    if val.is_ok() {
+                        log!("{:?} {:?}", k, val)
+                    }
+                }
+            }
+        }
+        let _type = Rc::new(Reflect::get(js_value, &JsValue::from_str("_type")).expect("_type err"));
+        let key = Reflect::get(js_value, &JsValue::from_str("key")).expect("key err").as_string();
+        let _ref = Reflect::get(js_value, &JsValue::from_str("_ref")).ok();
+        log!("{:?} {:?} {:?}", _type, key, _ref)
+
+        // let props_js_value = Reflect::get(js_value, &JsValue::from_str("props")).unwrap();
+        // let mut props: HashMap<String, JsValue> = HashMap::new();
+        // for prop in js_sys::Object::keys(props_js_value.dyn_ref::<Object>().unwrap()) {
+        //     let val = Reflect::get(&props_js_value, &prop);
+        //     match prop.as_string() {
+        //         None => {}
+        //         Some(k) => {
+        //             if val.is_ok() {
+        //                 props.insert(k, val.unwrap());
+        //             }
+        //         }
+        //     }
+        // }
+        // Self {
+        //     _typeof: REACT_ELEMENT_TYPE,
+        //     _type,
+        //     key,
+        //     _ref,
+        //     props: Rc::new(props),
+        //     __mark: MARK.to_string(),
+        // }
+    }
 }
 
 struct Config {}
@@ -58,10 +99,11 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> ReactElement {
         match prop.as_string() {
             None => {}
             Some(k) => {
+                log!("{} {:?}", k, val.clone().unwrap().as_string());
                 if k == "key" && val.is_ok() {
                     key = val.unwrap().as_string();
                 } else if k == "ref" && val.is_ok() {
-                    _ref = Some(val.unwrap());
+                    _ref = val.ok();
                 } else if val.is_ok() {
                     props.insert(k, val.unwrap());
                 }
@@ -69,12 +111,11 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> ReactElement {
         }
     }
 
-    let a = _type.dyn_ref::<Function>();
-    if a.is_some() {
-        let this = JsValue::null();
-        &a.unwrap().call0(&this).unwrap();
-    } else {
-    }
-
+    // let a = _type.dyn_ref::<Function>();
+    // if a.is_some() {
+    //     let this = JsValue::null();
+    //     &a.unwrap().call0(&this).unwrap();
+    // } else {}
+    log!("{:?} {:?}", _ref, props);
     ReactElement::new(Rc::new(_type.clone()), key, _ref, Rc::new(props))
 }

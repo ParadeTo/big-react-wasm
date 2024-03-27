@@ -12,6 +12,9 @@ mod utils;
 pub mod fiber;
 mod work_tags;
 mod update_queue;
+mod begin_work;
+mod child_fiber;
+mod work_loop;
 
 #[wasm_bindgen]
 extern "C" {
