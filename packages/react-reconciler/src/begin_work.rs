@@ -4,7 +4,6 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 
 use crate::fiber::FiberNode;
-use crate::utils::derive_from_js_value;
 use crate::work_tags::WorkTag;
 
 pub fn begin_work(work_in_progress: Rc<RefCell<FiberNode>>) {
@@ -18,9 +17,10 @@ pub fn begin_work(work_in_progress: Rc<RefCell<FiberNode>>) {
 }
 
 pub fn update_host_component(work_in_progress: Rc<RefCell<FiberNode>>) {
-    let work_in_progress = Rc::clone(&work_in_progress);
-    let borrowed = work_in_progress.borrow();
-    let next_children = derive_from_js_value(borrowed.pending_props.clone(), "children");
+    // let work_in_progress = Rc::clone(&work_in_progress);
+    // let ref_fiber_node = work_in_progress.borrow();
+    // let next_children = derive_from_js_value(ref_fiber_node.pending_props.clone(), "children");
+    // reconcile_children(work_in_progress, next_children);
 }
 
 

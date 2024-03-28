@@ -2,8 +2,11 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
+use bitflags::bitflags;
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
+
+use react::ReactElement;
 
 use crate::update_queue::{Update, UpdateQueue, UpdateType};
 use crate::work_tags::WorkTag;
@@ -16,18 +19,21 @@ pub enum StateNode {
     FiberRootNode(Rc<RefCell<FiberRootNode>>),
 }
 
-#[derive(Debug, Clone)]
-pub enum Flags {
-    NoFlags = 0b00000000000000000000000000,
-    Placement = 0b00000000000000000000000010,
-    Update = 0b00000000000000000000000100,
-    Deletion = 0b00000000000000000000001000,
+bitflags! {
+    #[derive(Debug, Clone)]
+    pub struct Flags: u32 {
+        const NoFlags = 0b00000000000000000000000000;
+        const Placement = 0b00000000000000000000000010;
+        const Update = 0b00000000000000000000000100;
+        const Deletion = 0b00000000000000000000001000;
+    }
 }
+
 
 #[derive(Debug, Clone)]
 pub struct FiberNode {
     pub tag: WorkTag,
-    pub pending_props: Option<JsValue>,
+    pub pending_props: Option<Rc<JsValue>>,
     key: Option<String>,
     pub state_node: Option<StateNode>,
     pub update_queue: Option<Weak<RefCell<UpdateQueue>>>,
@@ -35,7 +41,7 @@ pub struct FiberNode {
     pub sibling: Option<Rc<RefCell<FiberNode>>>,
     pub child: Option<Rc<RefCell<FiberNode>>>,
     pub alternate: Option<Weak<RefCell<FiberNode>>>,
-    pub _type: JsValue,
+    pub _type: Option<Rc<JsValue>>,
     pub flags: Flags,
     pub memoized_props: JsValue,
     pub memoized_state: JsValue,
@@ -44,10 +50,10 @@ pub struct FiberNode {
 impl Node for FiberNode {}
 
 impl FiberNode {
-    pub fn new(tag: WorkTag, pending_props: &JsValue, key: Option<String>) -> Self {
+    pub fn new(tag: WorkTag, pending_props: Option<Rc<JsValue>>, key: Option<String>) -> Self {
         Self {
             tag,
-            pending_props: Some(pending_props.clone()),
+            pending_props,
             key,
             state_node: None,
             update_queue: None,
@@ -55,11 +61,23 @@ impl FiberNode {
             sibling: None,
             child: None,
             alternate: None,
-            _type: JsValue::null(),
+            _type: None,
             memoized_props: JsValue::null(),
             memoized_state: JsValue::null(),
             flags: Flags::NoFlags,
         }
+    }
+
+    pub fn create_fiber_from_element(element: Rc<JsValue>) -> Self {
+        let element = ReactElement::from_js_value(element.deref().as_ref());
+        let ReactElement { _type, key, props, .. } = element;
+        let mut fiberTag = WorkTag::FunctionComponent;
+        if _type.is_string() {
+            fiberTag = WorkTag::HostComponent
+        }
+        let mut fiber = FiberNode::new(fiberTag, props, key);
+        fiber._type = Some(_type);
+        fiber
     }
 
     pub fn enqueue_update(&mut self, update: Update) {
@@ -89,7 +107,7 @@ impl FiberNode {
 
     pub fn create_work_in_progress(
         current: Rc<RefCell<FiberNode>>,
-        pending_props: &JsValue,
+        pending_props: Rc<JsValue>,
     ) -> Weak<RefCell<FiberNode>> {
         let c_rc = Rc::clone(&current);
         let c = c_rc.borrow();

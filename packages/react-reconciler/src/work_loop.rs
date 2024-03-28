@@ -3,6 +3,8 @@ use std::rc::{Rc, Weak};
 
 use wasm_bindgen::JsValue;
 
+use shared::log;
+
 use crate::begin_work::begin_work;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::work_tags::WorkTag;
@@ -62,11 +64,16 @@ fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
 }
 
 fn perform_sync_work_on_root(root: Rc<RefCell<FiberRootNode>>) {
-    prepare_fresh_stack(root);
+    prepare_fresh_stack(Rc::clone(&root));
 
     loop {
         work_loop();
+        break;
     }
+
+
+    // commit
+    log!("{:?}", Rc::clone(&root))
 }
 
 fn prepare_fresh_stack(root: Rc<RefCell<FiberRootNode>>) {
@@ -74,7 +81,7 @@ fn prepare_fresh_stack(root: Rc<RefCell<FiberRootNode>>) {
     unsafe {
         WORK_IN_PROGRESS = Some(FiberNode::create_work_in_progress(
             root.borrow().current.upgrade().unwrap(),
-            &JsValue::null(),
+            Rc::new(JsValue::null()),
         ));
     }
 }

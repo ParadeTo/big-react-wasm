@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use wasm_bindgen::JsCast;
@@ -6,7 +5,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::js_sys;
 use web_sys::js_sys::{Object, Reflect};
 
-use shared::{get_react_element_type, log};
+use shared::{log, REACT_ELEMENT};
 
 use crate::utils::set_panic_hook;
 
@@ -14,14 +13,13 @@ mod utils;
 
 const MARK: &str = "ayou";
 
-#[wasm_bindgen]
 #[derive(Debug)]
 pub struct ReactElement {
-    _typeof: JsValue,
-    _type: Rc<JsValue>,
-    key: Option<String>,
+    _typeof: String,
+    pub _type: Rc<JsValue>,
+    pub key: Option<String>,
     _ref: Option<JsValue>,
-    props: Rc<HashMap<String, JsValue>>,
+    pub props: Option<Rc<JsValue>>,
     __mark: String,
 }
 
@@ -30,10 +28,10 @@ impl ReactElement {
         _type: Rc<JsValue>,
         key: Option<String>,
         _ref: Option<JsValue>,
-        props: Rc<HashMap<String, JsValue>>,
+        props: Option<Rc<JsValue>>,
     ) -> Self {
         Self {
-            _typeof: get_react_element_type(),
+            _typeof: REACT_ELEMENT.to_string(),
             _type,
             key,
             _ref,
@@ -47,26 +45,26 @@ impl ReactElement {
         let key = Reflect::get(js_value, &JsValue::from_str("key")).expect("key err").as_string();
         let _ref = Reflect::get(js_value, &JsValue::from_str("_ref")).ok();
 
-        let props_js_value = Reflect::get(js_value, &JsValue::from_str("props")).unwrap();
-        let mut props: HashMap<String, JsValue> = HashMap::new();
-        for prop in js_sys::Object::keys(props_js_value.dyn_ref::<Object>().unwrap()) {
-            let val = Reflect::get(&props_js_value, &prop);
-            match prop.as_string() {
-                None => {}
-                Some(k) => {
-                    if val.is_ok() {
-                        props.insert(k, val.unwrap());
-                    }
-                }
-            }
-        }
+        let props = Reflect::get(js_value, &JsValue::from_str("props")).unwrap();
+        // let mut props: HashMap<String, JsValue> = HashMap::new();
+        // for prop in js_sys::Object::keys(props_js_value.dyn_ref::<Object>().unwrap()) {
+        //     let val = Reflect::get(&props_js_value, &prop);
+        //     match prop.as_string() {
+        //         None => {}
+        //         Some(k) => {
+        //             if val.is_ok() {
+        //                 props.insert(k, val.unwrap());
+        //             }
+        //         }
+        //     }
+        // }
 
         Self {
-            _typeof: get_react_element_type(),
+            _typeof: REACT_ELEMENT.to_string(),
             _type,
             key,
             _ref,
-            props: Rc::new(props),
+            props: Some(Rc::new(props)),
             __mark: MARK.to_string(),
         }
     }
@@ -78,7 +76,7 @@ struct Config {}
 pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> JsValue {
     set_panic_hook();
     let obj = Object::new();
-    Reflect::set(&obj, &"_typeof".into(), &get_react_element_type()).expect("_typeof panic");
+    Reflect::set(&obj, &"_typeof".into(), &JsValue::from_str(REACT_ELEMENT)).expect("_typeof panic");
     Reflect::set(&obj, &"_type".into(), _type).expect("_type panic");
 
     let conf = config.dyn_ref::<Object>().unwrap();

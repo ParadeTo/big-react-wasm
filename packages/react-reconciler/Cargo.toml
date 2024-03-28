@@ -20,6 +20,7 @@ shared = { path = "../shared" }
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.7", optional = true }
+bitflags = "2.5.0"
 
 
 [dev-dependencies]
