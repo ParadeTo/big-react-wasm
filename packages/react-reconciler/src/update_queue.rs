@@ -1,7 +1,7 @@
 use std::cell::Ref;
 use std::rc::Rc;
 
-use wasm_bindgen::JsValue;
+use react::ReactElement;
 
 use crate::fiber::FiberNode;
 
@@ -9,8 +9,13 @@ use crate::fiber::FiberNode;
 pub struct UpdateAction;
 
 #[derive(Clone, Debug)]
+pub enum Action {
+    ReactElement(Rc<ReactElement>)
+}
+
+#[derive(Clone, Debug)]
 pub struct Update {
-    pub action: Option<Rc<JsValue>>,
+    pub action: Option<Action>,
 }
 
 #[derive(Clone, Debug)]
@@ -25,8 +30,8 @@ pub struct UpdateQueue {
 }
 
 
-pub fn create_update(action: Rc<JsValue>) -> Update {
-    Update { action: Some(action) }
+pub fn create_update(action: Rc<ReactElement>) -> Update {
+    Update { action: Some(Action::ReactElement(action)) }
 }
 
 pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {

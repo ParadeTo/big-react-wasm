@@ -42,45 +42,33 @@ impl ReactElement {
         }
     }
 
-    pub fn from_js_value(js_value: &JsValue) {
-        log!("{:?}", js_value.dyn_ref::<Object>().unwrap());
-        for prop in js_sys::Object::keys(js_value.dyn_ref::<Object>().unwrap()) {
-            let val = Reflect::get(&js_value, &prop);
+    pub fn from_js_value(js_value: &JsValue) -> Self {
+        let _type = Rc::new(Reflect::get(js_value, &JsValue::from_str("_type")).expect("_type err"));
+        let key = Reflect::get(js_value, &JsValue::from_str("key")).expect("key err").as_string();
+        let _ref = Reflect::get(js_value, &JsValue::from_str("_ref")).ok();
+
+        let props_js_value = Reflect::get(js_value, &JsValue::from_str("props")).unwrap();
+        let mut props: HashMap<String, JsValue> = HashMap::new();
+        for prop in js_sys::Object::keys(props_js_value.dyn_ref::<Object>().unwrap()) {
+            let val = Reflect::get(&props_js_value, &prop);
             match prop.as_string() {
                 None => {}
                 Some(k) => {
                     if val.is_ok() {
-                        log!("{:?} {:?}", k, val)
+                        props.insert(k, val.unwrap());
                     }
                 }
             }
         }
-        let _type = Rc::new(Reflect::get(js_value, &JsValue::from_str("_type")).expect("_type err"));
-        let key = Reflect::get(js_value, &JsValue::from_str("key")).expect("key err").as_string();
-        let _ref = Reflect::get(js_value, &JsValue::from_str("_ref")).ok();
-        log!("{:?} {:?} {:?}", _type, key, _ref)
 
-        // let props_js_value = Reflect::get(js_value, &JsValue::from_str("props")).unwrap();
-        // let mut props: HashMap<String, JsValue> = HashMap::new();
-        // for prop in js_sys::Object::keys(props_js_value.dyn_ref::<Object>().unwrap()) {
-        //     let val = Reflect::get(&props_js_value, &prop);
-        //     match prop.as_string() {
-        //         None => {}
-        //         Some(k) => {
-        //             if val.is_ok() {
-        //                 props.insert(k, val.unwrap());
-        //             }
-        //         }
-        //     }
-        // }
-        // Self {
-        //     _typeof: REACT_ELEMENT_TYPE,
-        //     _type,
-        //     key,
-        //     _ref,
-        //     props: Rc::new(props),
-        //     __mark: MARK.to_string(),
-        // }
+        Self {
+            _typeof: get_react_element_type(),
+            _type,
+            key,
+            _ref,
+            props: Rc::new(props),
+            __mark: MARK.to_string(),
+        }
     }
 }
 
@@ -111,7 +99,7 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> JsValue {
             }
         }
     }
-    
+
     Reflect::set(&obj, &"props".into(), &props).expect("props panic");
     obj.into()
 }

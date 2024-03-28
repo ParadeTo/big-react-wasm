@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use react::ReactElement;
 use react_reconciler::fiber::FiberRootNode;
-use shared::log;
+use react_reconciler::update_container;
 
 #[wasm_bindgen]
 pub struct Renderer {
@@ -24,8 +24,7 @@ impl Renderer {
 #[wasm_bindgen]
 impl Renderer {
     pub fn render(&self, element: &JsValue) {
-        let element = ReactElement::from_js_value(element);
-        log!("{:?}", element);
-        // update_container(Rc::new(element.clone()), self.root.borrow())
+        let element = Rc::new(ReactElement::from_js_value(element));
+        update_container(Rc::clone(&element), self.root.borrow())
     }
 }
