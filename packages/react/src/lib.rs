@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::js_sys;
 use web_sys::js_sys::{Object, Reflect};
 
-use shared::{log, REACT_ELEMENT_TYPE};
+use shared::{get_react_element_type, log};
 
 use crate::utils::set_panic_hook;
 
@@ -17,7 +17,7 @@ const MARK: &str = "ayou";
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct ReactElement {
-    _typeof: REACT_ELEMENT_TYPE,
+    _typeof: JsValue,
     _type: Rc<JsValue>,
     key: Option<String>,
     _ref: Option<JsValue>,
@@ -33,7 +33,7 @@ impl ReactElement {
         props: Rc<HashMap<String, JsValue>>,
     ) -> Self {
         Self {
-            _typeof: REACT_ELEMENT_TYPE,
+            _typeof: get_react_element_type(),
             _type,
             key,
             _ref,
@@ -87,13 +87,14 @@ impl ReactElement {
 struct Config {}
 
 #[wasm_bindgen(js_name = jsxDEV)]
-pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> ReactElement {
+pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> JsValue {
     set_panic_hook();
-    let conf = config.dyn_ref::<Object>().unwrap();
+    let obj = Object::new();
+    Reflect::set(&obj, &"_typeof".into(), &get_react_element_type()).expect("_typeof panic");
+    Reflect::set(&obj, &"_type".into(), _type).expect("_type panic");
 
-    let mut key: Option<String> = None;
-    let mut _ref: Option<JsValue> = None;
-    let mut props: HashMap<String, JsValue> = HashMap::new();
+    let conf = config.dyn_ref::<Object>().unwrap();
+    let mut props = Object::new();
     for prop in js_sys::Object::keys(conf) {
         let val = Reflect::get(conf, &prop);
         match prop.as_string() {
@@ -101,21 +102,16 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> ReactElement {
             Some(k) => {
                 log!("{} {:?}", k, val.clone().unwrap().as_string());
                 if k == "key" && val.is_ok() {
-                    key = val.unwrap().as_string();
+                    Reflect::set(&obj, &"key".into(), &val.unwrap()).expect("key panic");
                 } else if k == "ref" && val.is_ok() {
-                    _ref = val.ok();
+                    Reflect::set(&obj, &"_ref".into(), &val.unwrap()).expect("_ref panic");
                 } else if val.is_ok() {
-                    props.insert(k, val.unwrap());
+                    Reflect::set(&props, &JsValue::from(k), &val.unwrap()).expect("props panic");
                 }
             }
         }
     }
-
-    // let a = _type.dyn_ref::<Function>();
-    // if a.is_some() {
-    //     let this = JsValue::null();
-    //     &a.unwrap().call0(&this).unwrap();
-    // } else {}
-    log!("{:?} {:?}", _ref, props);
-    ReactElement::new(Rc::new(_type.clone()), key, _ref, Rc::new(props))
+    
+    Reflect::set(&obj, &"props".into(), &props).expect("props panic");
+    obj.into()
 }

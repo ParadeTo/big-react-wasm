@@ -1,5 +1,8 @@
-#[derive(Debug)]
-pub struct REACT_ELEMENT_TYPE;
+use web_sys::wasm_bindgen::JsValue;
+
+pub fn get_react_element_type() -> JsValue {
+    JsValue::symbol(Some("react.element"))
+}
 
 #[macro_export]
 macro_rules! log {
