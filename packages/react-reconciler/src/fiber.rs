@@ -63,7 +63,7 @@ impl FiberNode {
             alternate: None,
             _type: None,
             memoized_props: JsValue::null(),
-            memoized_state: JsValue::null(),
+            memoized_state: None,
             flags: Flags::NoFlags,
         }
     }
@@ -93,13 +93,13 @@ impl FiberNode {
         };
 
         let mut u = update_queue.borrow_mut();
-        u.shared.pending = update;
+        u.shared.pending = Some(update);
     }
 
     pub fn initialize_update_queue(&mut self) {
         self.update_queue = Some(Rc::downgrade(&Rc::new(RefCell::new(UpdateQueue {
             shared: UpdateType {
-                pending: Update { action: None },
+                pending: Some(Update { action: None }),
             },
         }))));
     }

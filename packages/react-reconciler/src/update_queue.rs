@@ -51,9 +51,9 @@ pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
             log!("{:?} process_update_queue, update_queue is empty", fiber)
         }
         Some(q) => {
-            let update_queue = q.upgrade().unwrap().clone().borrow_mut();
-            let pending = update_queue.shared.pending.clone();
-            update_queue.shared.pending = None;
+            let update_queue = q.upgrade().unwrap().clone();
+            let pending = update_queue.borrow_mut().shared.pending.clone();
+            update_queue.borrow_mut().shared.pending = None;
 
             if pending.is_some() {
                 let action = pending.unwrap().action;
@@ -63,7 +63,7 @@ pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
                         let f = action.dyn_ref::<Function>();
                         new_state = match f {
                             None => Some(action.clone()),
-                            Some(f) => f.call0(&JsValue::null()),
+                            Some(f) => Some(Rc::new(f.call0(&JsValue::null()).unwrap())),
                         }
                     }
                 }

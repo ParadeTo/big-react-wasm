@@ -95,7 +95,7 @@ fn work_loop() {
 }
 
 fn perform_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {
-    let next = begin_work(fiber);
+    let next = begin_work(fiber.clone());
     if next.is_none() {
         complete_unit_of_work(fiber.clone())
     } else {

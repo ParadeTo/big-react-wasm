@@ -11,12 +11,10 @@ use crate::update_queue::process_update_queue;
 use crate::work_tags::WorkTag;
 
 pub fn begin_work(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
-    let work_in_progress = Rc::clone(&work_in_progress);
-    let borrowed = work_in_progress.borrow();
-    return match borrowed.tag {
+    return match work_in_progress.clone().borrow().tag {
         WorkTag::FunctionComponent => None,
-        WorkTag::HostRoot => update_host_root(work_in_progress),
-        WorkTag::HostComponent => update_host_component(work_in_progress),
+        WorkTag::HostRoot => update_host_root(work_in_progress.clone()),
+        WorkTag::HostComponent => update_host_component(work_in_progress.clone()),
     };
 }
 
@@ -36,7 +34,7 @@ pub fn update_host_component(
     let ref_fiber_node = work_in_progress.borrow();
     let next_children =
         derive_from_js_value(ref_fiber_node.pending_props.clone().unwrap(), "children");
-    reconcile_children(work_in_progress, next_children);
+    reconcile_children(work_in_progress.clone(), next_children);
     work_in_progress.clone().borrow().child.clone()
 }
 
@@ -46,14 +44,14 @@ pub fn reconcile_children(work_in_progress: Rc<RefCell<FiberNode>>, children: Op
     if current.is_some() {
         // update
         work_in_progress.borrow_mut().child = reconcile_child_fibers(
-            work_in_progress,
+            work_in_progress.clone(),
             current.clone().unwrap().upgrade(),
             children,
         )
     } else {
         // mount
         work_in_progress.borrow_mut().child = reconcile_child_fibers(
-            work_in_progress,
+            work_in_progress.clone(),
             None,
             children,
         )
