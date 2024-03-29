@@ -1,7 +1,10 @@
-use std::cell::Ref;
+use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
+use web_sys::js_sys::Function;
+
+use shared::log;
 
 use crate::fiber::FiberNode;
 
@@ -16,7 +19,7 @@ pub struct Update {
 
 #[derive(Clone, Debug)]
 pub struct UpdateType {
-    pub pending: Update,
+    pub pending: Option<Update>,
 }
 
 
@@ -35,6 +38,38 @@ pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {
         let update_queue = fiber.update_queue.as_ref().unwrap();
         let update_queue = update_queue.upgrade().unwrap();
         let mut update_queue = update_queue.borrow_mut();
-        update_queue.shared.pending = update;
+        update_queue.shared.pending = Some(update);
     }
+}
+
+pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
+    let mut rc_fiber = fiber.clone();
+    let mut fiber = rc_fiber.borrow_mut();
+    let mut new_state = None;
+    match fiber.update_queue.as_mut() {
+        None => {
+            log!("{:?} process_update_queue, update_queue is empty", fiber)
+        }
+        Some(q) => {
+            let update_queue = q.upgrade().unwrap().clone().borrow_mut();
+            let pending = update_queue.shared.pending.clone();
+            update_queue.shared.pending = None;
+
+            if pending.is_some() {
+                let action = pending.unwrap().action;
+                match action {
+                    None => {}
+                    Some(action) => {
+                        let f = action.dyn_ref::<Function>();
+                        new_state = match f {
+                            None => Some(action.clone()),
+                            Some(f) => f.call0(&JsValue::null()),
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fiber.memoized_state = new_state
 }

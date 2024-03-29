@@ -95,5 +95,14 @@ fn work_loop() {
 }
 
 fn perform_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {
-    begin_work(fiber)
+    let next = begin_work(fiber);
+    if next.is_none() {
+        complete_unit_of_work(fiber.clone())
+    } else {
+        unsafe {
+            WORK_IN_PROGRESS = Some(Rc::downgrade(&next.unwrap()));
+        }
+    }
 }
+
+fn complete_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {}

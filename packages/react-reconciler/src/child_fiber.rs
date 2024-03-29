@@ -30,10 +30,11 @@ fn reconcile_single_element(
     Rc::new(RefCell::new(fiber))
 }
 
-pub fn reconcile_child_fibers(
+fn _reconcile_child_fibers(
     return_fiber: Rc<RefCell<FiberNode>>,
     current_first_child: Option<Rc<RefCell<FiberNode>>>,
     new_child: Option<Rc<JsValue>>,
+    should_track_effect: bool,
 ) -> Option<Rc<RefCell<FiberNode>>> {
     if (new_child.is_some()) {
         let new_child = Rc::clone(&new_child.unwrap());
@@ -41,14 +42,31 @@ pub fn reconcile_child_fibers(
             .as_string()
             .unwrap();
         if _typeof == REACT_ELEMENT {
-            return Some(place_single_child(reconcile_single_element(return_fiber, current_first_child, Some(new_child.clone())), true));
+            return Some(place_single_child(
+                reconcile_single_element(
+                    return_fiber,
+                    current_first_child,
+                    Some(new_child.clone()),
+                ),
+                should_track_effect,
+            ));
         }
     }
     return None;
+}
+
+pub fn reconcile_child_fibers(
+    return_fiber: Rc<RefCell<FiberNode>>,
+    current_first_child: Option<Rc<RefCell<FiberNode>>>,
+    new_child: Option<Rc<JsValue>>,
+) -> Option<Rc<RefCell<FiberNode>>> {
+    _reconcile_child_fibers(return_fiber, current_first_child, new_child, true)
 }
 
 pub fn mount_child_fibers(
     return_fiber: Rc<RefCell<FiberNode>>,
     current_first_child: Option<Rc<RefCell<FiberNode>>>,
     new_child: Option<Rc<JsValue>>,
-) {}
+) -> Option<Rc<RefCell<FiberNode>>> {
+    _reconcile_child_fibers(return_fiber, current_first_child, new_child, false)
+}

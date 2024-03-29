@@ -41,8 +41,11 @@ impl ReactElement {
     }
 
     pub fn from_js_value(js_value: &JsValue) -> Self {
-        let _type = Rc::new(Reflect::get(js_value, &JsValue::from_str("_type")).expect("_type err"));
-        let key = Reflect::get(js_value, &JsValue::from_str("key")).expect("key err").as_string();
+        let _type =
+            Rc::new(Reflect::get(js_value, &JsValue::from_str("_type")).expect("_type err"));
+        let key = Reflect::get(js_value, &JsValue::from_str("key"))
+            .expect("key err")
+            .as_string();
         let _ref = Reflect::get(js_value, &JsValue::from_str("_ref")).ok();
 
         let props = Reflect::get(js_value, &JsValue::from_str("props")).unwrap();
@@ -76,7 +79,8 @@ struct Config {}
 pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> JsValue {
     set_panic_hook();
     let obj = Object::new();
-    Reflect::set(&obj, &"_typeof".into(), &JsValue::from_str(REACT_ELEMENT)).expect("_typeof panic");
+    Reflect::set(&obj, &"_typeof".into(), &JsValue::from_str(REACT_ELEMENT))
+        .expect("_typeof panic");
     Reflect::set(&obj, &"_type".into(), _type).expect("_type panic");
 
     let conf = config.dyn_ref::<Object>().unwrap();

@@ -44,7 +44,7 @@ pub struct FiberNode {
     pub _type: Option<Rc<JsValue>>,
     pub flags: Flags,
     pub memoized_props: JsValue,
-    pub memoized_state: JsValue,
+    pub memoized_state: Option<Rc<JsValue>>,
 }
 
 impl Node for FiberNode {}
