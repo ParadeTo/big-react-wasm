@@ -21,11 +21,11 @@ pub enum StateNode {
 
 bitflags! {
     #[derive(Debug, Clone)]
-    pub struct Flags: u32 {
-        const NoFlags = 0b00000000000000000000000000;
-        const Placement = 0b00000000000000000000000010;
-        const Update = 0b00000000000000000000000100;
-        const Deletion = 0b00000000000000000000001000;
+    pub struct Flags: u8 {
+        const NoFlags = 0b00000000;
+        const Placement = 0b00000010;
+        const Update = 0b00000100;
+        const Deletion = 0b00001000;
     }
 }
 
@@ -43,6 +43,7 @@ pub struct FiberNode {
     pub alternate: Option<Weak<RefCell<FiberNode>>>,
     pub _type: Option<Rc<JsValue>>,
     pub flags: Flags,
+    pub subtree_flags: Flags,
     pub memoized_props: JsValue,
     pub memoized_state: Option<Rc<JsValue>>,
 }
@@ -65,6 +66,7 @@ impl FiberNode {
             memoized_props: JsValue::null(),
             memoized_state: None,
             flags: Flags::NoFlags,
+            subtree_flags: Flags::NoFlags,
         }
     }
 

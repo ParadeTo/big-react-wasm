@@ -105,4 +105,8 @@ fn perform_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {
     }
 }
 
-fn complete_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {}
+fn complete_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {
+    let node: Option<Rc<RefCell<FiberNode>>> = Some(fiber);
+
+    loop {}
+}

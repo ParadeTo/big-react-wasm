@@ -16,6 +16,8 @@ mod update_queue;
 mod begin_work;
 mod child_fiber;
 mod work_loop;
+mod complete_work;
+pub mod host_config;
 
 #[wasm_bindgen]
 extern "C" {

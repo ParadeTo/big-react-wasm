@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::ops::Deref;
 use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
@@ -8,22 +7,22 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use react_reconciler::fiber::FiberRootNode;
 use react_reconciler::update_container;
-use shared::{compare_js_value, derive_from_js_value, log, REACT_ELEMENT};
 
 #[wasm_bindgen]
-pub struct Renderer {
+#[derive(Clone)]
+pub struct DomRenderer {
     #[wasm_bindgen(skip)]
     pub root: Rc<RefCell<FiberRootNode>>,
 }
 
-impl Renderer {
+impl DomRenderer {
     pub fn new(root: Rc<RefCell<FiberRootNode>>) -> Self {
         Self { root }
     }
 }
 
 #[wasm_bindgen]
-impl Renderer {
+impl DomRenderer {
     pub fn render(&self, element: &JsValue) {
         // let element = Rc::new(ReactElement::from_js_value(element));
 
@@ -42,3 +41,5 @@ impl Renderer {
         update_container(Rc::new(element.clone()), self.root.borrow())
     }
 }
+
+
