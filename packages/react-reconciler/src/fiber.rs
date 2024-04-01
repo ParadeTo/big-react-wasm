@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
@@ -14,10 +15,12 @@ use crate::work_tags::WorkTag;
 trait Node {}
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum StateNode {
     FiberRootNode(Rc<RefCell<FiberRootNode>>),
+    Element(Box<dyn Any>),
 }
+
 
 bitflags! {
     #[derive(Debug, Clone)]
@@ -30,7 +33,7 @@ bitflags! {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FiberNode {
     pub tag: WorkTag,
     pub pending_props: Option<Rc<JsValue>>,
@@ -110,19 +113,26 @@ impl FiberNode {
     pub fn create_work_in_progress(
         current: Rc<RefCell<FiberNode>>,
         pending_props: Rc<JsValue>,
-    ) -> Weak<RefCell<FiberNode>> {
+    ) -> Rc<RefCell<FiberNode>> {
         let c_rc = Rc::clone(&current);
-        let c = c_rc.borrow();
-        let w = c.deref().alternate.as_ref();
+        let w = {
+            let c = c_rc.borrow();
+            c.deref().alternate.clone()
+        };
         return if w.is_none() {
-            let mut wip = Rc::clone(&current).borrow_mut().deref().clone();
+            let mut wip = {
+                let c = c_rc.borrow();
+                FiberNode::new(c.tag.clone(), c.pending_props.clone(), c.key.clone())
+            };
             wip.alternate = Some(Rc::downgrade(&current));
             let wip_rc = Rc::new(RefCell::new(wip));
             let mut fibler_node = c_rc.borrow_mut();
             fibler_node.alternate = Some(Rc::downgrade(&wip_rc));
-            Rc::downgrade(&wip_rc)
+            wip_rc
         } else {
-            let mut wip = w.unwrap().upgrade().unwrap().borrow_mut().clone();
+            let c = c_rc.borrow();
+            let a = w.clone().unwrap().upgrade().clone().unwrap();
+            let mut wip = a.borrow_mut();
 
             wip.pending_props = Some(pending_props.clone());
             wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
@@ -130,7 +140,7 @@ impl FiberNode {
             wip.child = Some(Rc::clone(c.child.as_ref().unwrap()));
             wip.memoized_props = c.memoized_props.clone();
             wip.memoized_state = c.memoized_state.clone();
-            Rc::downgrade(&Rc::new(RefCell::new(wip)))
+            w.clone().unwrap().upgrade().unwrap()
         };
     }
 }
@@ -138,7 +148,7 @@ impl FiberNode {
 #[derive(Debug)]
 pub struct FiberRootNode {
     container: Box<JsValue>,
-    pub current: Weak<RefCell<FiberNode>>,
+    pub current: Rc<RefCell<FiberNode>>,
 }
 
 impl Node for FiberRootNode {}
@@ -147,7 +157,7 @@ impl FiberRootNode {
     pub fn new(container: Box<JsValue>, host_root_fiber: Rc<RefCell<FiberNode>>) -> Self {
         Self {
             container,
-            current: Rc::downgrade(&host_root_fiber),
+            current: host_root_fiber,
         }
     }
 

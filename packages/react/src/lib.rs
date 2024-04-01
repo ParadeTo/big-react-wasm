@@ -105,3 +105,33 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> JsValue {
     Reflect::set(&obj, &"props".into(), &props).expect("props panic");
     obj.into()
 }
+
+pub fn jsx(_type: &JsValue, config: &JsValue) -> JsValue {
+    set_panic_hook();
+    let obj = Object::new();
+    Reflect::set(&obj, &"_typeof".into(), &JsValue::from_str(REACT_ELEMENT))
+        .expect("_typeof panic");
+    Reflect::set(&obj, &"_type".into(), _type).expect("_type panic");
+
+    let conf = config.dyn_ref::<Object>().unwrap();
+    let mut props = Object::new();
+    for prop in js_sys::Object::keys(conf) {
+        let val = Reflect::get(conf, &prop);
+        match prop.as_string() {
+            None => {}
+            Some(k) => {
+                log!("{} {:?}", k, val.clone().unwrap().as_string());
+                if k == "key" && val.is_ok() {
+                    Reflect::set(&obj, &"key".into(), &val.unwrap()).expect("key panic");
+                } else if k == "ref" && val.is_ok() {
+                    Reflect::set(&obj, &"_ref".into(), &val.unwrap()).expect("_ref panic");
+                } else if val.is_ok() {
+                    Reflect::set(&props, &JsValue::from(k), &val.unwrap()).expect("props panic");
+                }
+            }
+        }
+    }
+
+    Reflect::set(&obj, &"props".into(), &props).expect("props panic");
+    obj.into()
+}

@@ -38,7 +38,24 @@ impl DomRenderer {
         //     log!("equal");
         // }
 
-        update_container(Rc::new(element.clone()), self.root.borrow())
+        update_container(Rc::new(element.clone()), self.root.clone())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use wasm_bindgen::JsValue;
+    use web_sys::js_sys::Object;
+
+    use react::jsx_dev;
+
+    use crate::create_root;
+
+    fn renderer() {
+        let jsx = jsx_dev(&JsValue::from_str("div"), &Object::new());
+        let renderer = create_root(&jsx);
+        renderer.render(&JsValue::null());
     }
 }
 

@@ -11,7 +11,8 @@ use crate::update_queue::process_update_queue;
 use crate::work_tags::WorkTag;
 
 pub fn begin_work(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
-    return match work_in_progress.clone().borrow().tag {
+    let tag = work_in_progress.clone().borrow().tag.clone();
+    return match tag {
         WorkTag::FunctionComponent => None,
         WorkTag::HostRoot => update_host_root(work_in_progress.clone()),
         WorkTag::HostComponent => update_host_component(work_in_progress.clone()),
@@ -26,6 +27,7 @@ pub fn update_host_root(
     reconcile_children(work_in_progress.clone(), next_children);
     work_in_progress.clone().borrow().child.clone()
 }
+
 
 pub fn update_host_component(
     work_in_progress: Rc<RefCell<FiberNode>>,

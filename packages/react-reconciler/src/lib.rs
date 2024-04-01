@@ -1,12 +1,14 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 
+use shared::log;
+
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::update_queue::{create_update, enqueue_update};
-use crate::work_loop::schedule_update_on_fiber;
+use crate::work_loop::WorkLoop;
 use crate::work_tags::WorkTag;
 
 mod utils;
@@ -30,13 +32,16 @@ pub fn create_container(container: &JsValue) -> Rc<RefCell<FiberRootNode>> {
     let root = Rc::new(RefCell::new(FiberRootNode::new(Box::new(container.clone()), host_root_fiber.clone())));
     let r1 = root.clone();
     host_root_fiber.borrow_mut().state_node = Some(StateNode::FiberRootNode(r1));
+    log!("create_container, {:?}", root.clone().borrow().current.clone().borrow().tag);
     root.clone()
 }
 
-pub fn update_container(element: Rc<JsValue>, root: Ref<FiberRootNode>) {
-    let host_root_fiber = root.current.upgrade().unwrap();
+pub fn update_container(element: Rc<JsValue>, root: Rc<RefCell<FiberRootNode>>) {
+    log!("update_container, {:?}", root.clone().borrow().current.clone().borrow().tag);
+    let host_root_fiber = Rc::clone(&root).borrow().current.clone();
     let update = create_update(element);
     enqueue_update(host_root_fiber.borrow(), update);
-    schedule_update_on_fiber(host_root_fiber);
+    let mut work_loop = WorkLoop::new();
+    work_loop.schedule_update_on_fiber(host_root_fiber);
 }
 

@@ -44,17 +44,16 @@ pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {
 
 pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
     let mut rc_fiber = fiber.clone();
-    let mut fiber = rc_fiber.borrow_mut();
+    let mut fiber = rc_fiber.try_borrow_mut().expect("borrow error");
     let mut new_state = None;
-    match fiber.update_queue.as_mut() {
+    match fiber.update_queue.clone() {
         None => {
             log!("{:?} process_update_queue, update_queue is empty", fiber)
         }
         Some(q) => {
-            let update_queue = q.upgrade().unwrap().clone();
-            let pending = update_queue.borrow_mut().shared.pending.clone();
+            let update_queue = q.upgrade().clone().unwrap();
+            let pending = update_queue.clone().borrow().shared.pending.clone();
             update_queue.borrow_mut().shared.pending = None;
-
             if pending.is_some() {
                 let action = pending.unwrap().action;
                 match action {

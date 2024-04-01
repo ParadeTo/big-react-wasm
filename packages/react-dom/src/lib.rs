@@ -28,3 +28,5 @@ pub fn create_root(container: &JsValue) -> DomRenderer {
     log!("{:?}", a.create_instance("div".to_string()));
     renderer
 }
+
+

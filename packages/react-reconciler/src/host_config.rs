@@ -1,12 +1,14 @@
+use std::any::Any;
 use std::sync::{Mutex, MutexGuard, Once};
 
 use once_cell::sync::OnceCell;
-use web_sys::Element;
 
 pub trait HostConfig {
-    fn create_instance(&self, _type: String) -> Element;
-    fn append_initial_child(&self, parent: Element, child: Element);
+    fn create_instance(&self, _type: String) -> Box<dyn Any>;
+    fn append_initial_child(&self, parent: Box<dyn Any>, child: Box<dyn Any>);
 }
+
+pub trait Ele {}
 
 static INIT: Once = Once::new();
 
