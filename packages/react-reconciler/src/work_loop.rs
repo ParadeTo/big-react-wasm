@@ -6,8 +6,10 @@ use wasm_bindgen::JsValue;
 use shared::log;
 
 use crate::begin_work::begin_work;
+use crate::commit_work::CommitWork;
 use crate::complete_work::complete_work;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
+use crate::fiber_flags::get_mutation_mask;
 use crate::work_tags::WorkTag;
 
 static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
@@ -54,15 +56,23 @@ impl WorkLoop {
         let fiber_node_rc = Rc::clone(&node);
         let fiber_node = fiber_node_rc.borrow();
         if fiber_node.tag == WorkTag::HostRoot {
-            match fiber_node.state_node.as_ref() {
+            match fiber_node.state_node.clone() {
                 None => {}
                 Some(state_node) => {
-                    return match state_node {
+                    let state_node = state_node;
+                    return match &*state_node {
                         StateNode::FiberRootNode(fiber_root_node) => {
-                            Some(Rc::clone(fiber_root_node))
+                            Some(Rc::clone(&fiber_root_node))
                         }
-                        _ => todo!(),
+                        StateNode::Element(_) => todo!()
                     };
+                    // return match state_node.clone() {
+                    //     // StateNode::FiberRootNode(fiber_root_node) => {
+                    //     //     Some(Rc::clone(fiber_root_node))
+                    //     // }
+                    //     // _ => todo!(),
+                    //     Rc { .. } => {}
+                    // };
                 }
             }
         }
@@ -86,7 +96,29 @@ impl WorkLoop {
         log!(
             "commit {:?}",
             Rc::clone(&root).borrow().current.clone().borrow().tag
-        )
+        );
+        self.commit_root(root);
+    }
+
+    fn commit_root(&self, root: Rc<RefCell<FiberRootNode>>) {
+        let cloned = root.clone();
+        if cloned.borrow().finished_work.is_none() {
+            return;
+        }
+
+        cloned.borrow_mut().finished_work = None;
+
+        let finished_work = cloned.borrow().finished_work.clone();
+        let subtree_has_effect = get_mutation_mask().contains(finished_work.clone().unwrap().borrow().flags.clone());
+        let root_has_effect = get_mutation_mask().contains(finished_work.clone().unwrap().borrow().flags.clone());
+
+        let mut commit_work = &mut CommitWork::new();
+        if subtree_has_effect || root_has_effect {
+            commit_work.commit_mutation_effects(root.borrow().finished_work.clone());
+            cloned.borrow_mut().current = cloned.borrow().finished_work.clone().unwrap();
+        } else {
+            cloned.borrow_mut().current = cloned.borrow().finished_work.clone().unwrap();
+        }
     }
 
     fn prepare_fresh_stack(&mut self, root: Rc<RefCell<FiberRootNode>>) {
@@ -130,19 +162,17 @@ impl WorkLoop {
                 return;
             }
 
-            node = node
+            let _return = node
                 .clone()
                 .unwrap()
                 .clone()
                 .borrow()
                 ._return
-                .clone()
-                .unwrap()
-                .clone()
-                .upgrade();
-            self.work_in_progress = node.clone();
+                .clone();
 
-            if node.is_none() {
+            if _return.is_some() {
+                self.work_in_progress = _return.unwrap().upgrade();
+            } else {
                 break;
             }
         }

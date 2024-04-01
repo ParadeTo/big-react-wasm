@@ -4,8 +4,6 @@ use std::rc::Rc;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::Function;
 
-use shared::log;
-
 use crate::fiber::FiberNode;
 
 #[derive(Clone, Debug)]
@@ -48,7 +46,7 @@ pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
     let mut new_state = None;
     match fiber.update_queue.clone() {
         None => {
-            log!("{:?} process_update_queue, update_queue is empty", fiber)
+            // log!("{:?} process_update_queue, update_queue is empty", fiber)
         }
         Some(q) => {
             let update_queue = q.upgrade().clone().unwrap();

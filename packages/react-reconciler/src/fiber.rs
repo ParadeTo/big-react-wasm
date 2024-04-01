@@ -3,12 +3,12 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
-use bitflags::bitflags;
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
 
 use react::ReactElement;
 
+use crate::fiber_flags::Flags;
 use crate::update_queue::{Update, UpdateQueue, UpdateType};
 use crate::work_tags::WorkTag;
 
@@ -18,18 +18,7 @@ trait Node {}
 #[derive(Debug)]
 pub enum StateNode {
     FiberRootNode(Rc<RefCell<FiberRootNode>>),
-    Element(Box<dyn Any>),
-}
-
-
-bitflags! {
-    #[derive(Debug, Clone)]
-    pub struct Flags: u8 {
-        const NoFlags = 0b00000000;
-        const Placement = 0b00000010;
-        const Update = 0b00000100;
-        const Deletion = 0b00001000;
-    }
+    Element(Rc<dyn Any>),
 }
 
 
@@ -38,7 +27,7 @@ pub struct FiberNode {
     pub tag: WorkTag,
     pub pending_props: Option<Rc<JsValue>>,
     key: Option<String>,
-    pub state_node: Option<StateNode>,
+    pub state_node: Option<Rc<StateNode>>,
     pub update_queue: Option<Weak<RefCell<UpdateQueue>>>,
     pub _return: Option<Weak<RefCell<FiberNode>>>,
     pub sibling: Option<Rc<RefCell<FiberNode>>>,
@@ -149,6 +138,7 @@ impl FiberNode {
 pub struct FiberRootNode {
     container: Box<JsValue>,
     pub current: Rc<RefCell<FiberNode>>,
+    pub finished_work: Option<Rc<RefCell<FiberNode>>>,
 }
 
 impl Node for FiberRootNode {}
@@ -158,6 +148,7 @@ impl FiberRootNode {
         Self {
             container,
             current: host_root_fiber,
+            finished_work: None,
         }
     }
 

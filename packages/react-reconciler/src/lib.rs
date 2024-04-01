@@ -19,6 +19,8 @@ mod begin_work;
 mod child_fiber;
 mod work_loop;
 mod complete_work;
+mod commit_work;
+pub mod fiber_flags;
 pub mod host_config;
 
 #[wasm_bindgen]
@@ -31,7 +33,7 @@ pub fn create_container(container: &JsValue) -> Rc<RefCell<FiberRootNode>> {
     let mut host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot, None, None)));
     let root = Rc::new(RefCell::new(FiberRootNode::new(Box::new(container.clone()), host_root_fiber.clone())));
     let r1 = root.clone();
-    host_root_fiber.borrow_mut().state_node = Some(StateNode::FiberRootNode(r1));
+    host_root_fiber.borrow_mut().state_node = Some(Rc::new(StateNode::FiberRootNode(r1)));
     log!("create_container, {:?}", root.clone().borrow().current.clone().borrow().tag);
     root.clone()
 }

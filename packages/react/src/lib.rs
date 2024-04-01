@@ -84,7 +84,7 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue) -> JsValue {
     Reflect::set(&obj, &"_type".into(), _type).expect("_type panic");
 
     let conf = config.dyn_ref::<Object>().unwrap();
-    let mut props = Object::new();
+    let props = Object::new();
     for prop in js_sys::Object::keys(conf) {
         let val = Reflect::get(conf, &prop);
         match prop.as_string() {
