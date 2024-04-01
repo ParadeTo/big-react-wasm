@@ -131,9 +131,9 @@ impl WorkLoop {
     }
 
     fn work_loop(&mut self) {
-        while self.work_in_progress.is_some() {
-            self.perform_unit_of_work(self.work_in_progress.clone().unwrap());
-        }
+        // while self.work_in_progress.is_some() {
+        self.perform_unit_of_work(self.work_in_progress.clone().unwrap());
+        // }
     }
 
     fn perform_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) {

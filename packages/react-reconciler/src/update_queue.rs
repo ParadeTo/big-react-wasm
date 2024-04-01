@@ -4,6 +4,8 @@ use std::rc::Rc;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::Function;
 
+use shared::log;
+
 use crate::fiber::FiberNode;
 
 #[derive(Clone, Debug)]
@@ -33,23 +35,24 @@ pub fn create_update(action: Rc<JsValue>) -> Update {
 
 pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {
     if fiber.update_queue.is_some() {
-        let update_queue = fiber.update_queue.as_ref().unwrap();
-        let update_queue = update_queue.upgrade().unwrap();
-        let mut update_queue = update_queue.borrow_mut();
+        // let update_queue = fiber.update_queue.as_ref().unwrap();
+        // let update_queue = update_queue;
+        let uq = fiber.update_queue.clone().unwrap();
+        let mut update_queue = uq.borrow_mut();
         update_queue.shared.pending = Some(update);
     }
 }
 
 pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
     let mut rc_fiber = fiber.clone();
-    let mut fiber = rc_fiber.try_borrow_mut().expect("borrow error");
+    let mut fiber = rc_fiber.borrow_mut();
     let mut new_state = None;
     match fiber.update_queue.clone() {
         None => {
-            // log!("{:?} process_update_queue, update_queue is empty", fiber)
+            log!("{:?} process_update_queue, update_queue is empty", fiber)
         }
         Some(q) => {
-            let update_queue = q.upgrade().clone().unwrap();
+            let update_queue = q.clone();
             let pending = update_queue.clone().borrow().shared.pending.clone();
             update_queue.borrow_mut().shared.pending = None;
             if pending.is_some() {

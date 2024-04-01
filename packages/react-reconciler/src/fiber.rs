@@ -28,7 +28,7 @@ pub struct FiberNode {
     pub pending_props: Option<Rc<JsValue>>,
     key: Option<String>,
     pub state_node: Option<Rc<StateNode>>,
-    pub update_queue: Option<Weak<RefCell<UpdateQueue>>>,
+    pub update_queue: Option<Rc<RefCell<UpdateQueue>>>,
     pub _return: Option<Weak<RefCell<FiberNode>>>,
     pub sibling: Option<Rc<RefCell<FiberNode>>>,
     pub child: Option<Rc<RefCell<FiberNode>>>,
@@ -62,6 +62,8 @@ impl FiberNode {
         }
     }
 
+    // pub fn initialize_update_queue(&self) {}
+
     pub fn create_fiber_from_element(element: Rc<JsValue>) -> Self {
         let element = ReactElement::from_js_value(element.deref().as_ref());
         let ReactElement { _type, key, props, .. } = element;
@@ -80,7 +82,7 @@ impl FiberNode {
                 return;
             }
             Some(a) => {
-                let b = a.upgrade().clone().unwrap();
+                let b = a.clone();
 
                 b
             }
@@ -91,11 +93,11 @@ impl FiberNode {
     }
 
     pub fn initialize_update_queue(&mut self) {
-        self.update_queue = Some(Rc::downgrade(&Rc::new(RefCell::new(UpdateQueue {
+        self.update_queue = Some(Rc::new(RefCell::new(UpdateQueue {
             shared: UpdateType {
                 pending: Some(Update { action: None }),
             },
-        }))));
+        })));
     }
 
 
