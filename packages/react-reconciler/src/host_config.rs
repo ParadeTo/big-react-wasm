@@ -8,7 +8,7 @@ pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;
     fn create_instance(&self, _type: String) -> Rc<dyn Any>;
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>);
-    fn append_child_to_container(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>);
+    fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>);
 }
 
 pub trait Ele {}

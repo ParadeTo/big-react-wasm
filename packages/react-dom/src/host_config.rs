@@ -5,6 +5,7 @@ use std::rc::Rc;
 use web_sys::{Element, window};
 
 use react_reconciler::host_config::HostConfig;
+use shared::log;
 
 pub struct DomHostConfig;
 
@@ -27,13 +28,14 @@ impl HostConfig for DomHostConfig {
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>) {
         let parent = parent.downcast::<Element>().unwrap();
         let child = child.downcast::<Element>().unwrap();
+        log!("append_initial_child - {:?} {:?}",parent, child);
         match parent.append_child(child.deref()) {
             Ok(_) => {}
             Err(_) => todo!()
         }
     }
 
-    fn append_child_to_container(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>) {
+    fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>) {
         self.append_initial_child(parent, child)
     }
 }

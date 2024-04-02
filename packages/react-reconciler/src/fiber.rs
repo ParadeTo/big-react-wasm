@@ -32,7 +32,7 @@ pub struct FiberNode {
     pub _return: Option<Weak<RefCell<FiberNode>>>,
     pub sibling: Option<Rc<RefCell<FiberNode>>>,
     pub child: Option<Rc<RefCell<FiberNode>>>,
-    pub alternate: Option<Weak<RefCell<FiberNode>>>,
+    pub alternate: Option<Rc<RefCell<FiberNode>>>,
     pub _type: Option<Rc<JsValue>>,
     pub flags: Flags,
     pub subtree_flags: Flags,
@@ -110,19 +110,26 @@ impl FiberNode {
             let c = c_rc.borrow();
             c.deref().alternate.clone()
         };
+
         return if w.is_none() {
             let mut wip = {
                 let c = c_rc.borrow();
-                FiberNode::new(c.tag.clone(), c.pending_props.clone(), c.key.clone())
+                let mut wip = FiberNode::new(c.tag.clone(), c.pending_props.clone(), c.key.clone());
+                wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
+                wip.flags = c.flags.clone();
+                wip.child = c.child.clone();
+                wip.memoized_props = c.memoized_props.clone();
+                wip.memoized_state = c.memoized_state.clone();
+                wip
             };
-            wip.alternate = Some(Rc::downgrade(&current));
+            wip.alternate = Some(current);
             let wip_rc = Rc::new(RefCell::new(wip));
             let mut fibler_node = c_rc.borrow_mut();
-            fibler_node.alternate = Some(Rc::downgrade(&wip_rc));
+            fibler_node.alternate = Some(wip_rc.clone());
             wip_rc
         } else {
             let c = c_rc.borrow();
-            let a = w.clone().unwrap().upgrade().clone().unwrap();
+            let a = w.clone().unwrap();
             let mut wip = a.borrow_mut();
 
             wip.pending_props = Some(pending_props.clone());
@@ -131,7 +138,7 @@ impl FiberNode {
             wip.child = Some(Rc::clone(c.child.as_ref().unwrap()));
             wip.memoized_props = c.memoized_props.clone();
             wip.memoized_state = c.memoized_state.clone();
-            w.clone().unwrap().upgrade().unwrap()
+            w.clone().unwrap()
         };
     }
 }

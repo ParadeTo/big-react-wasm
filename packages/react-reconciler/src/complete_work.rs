@@ -2,6 +2,9 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use wasm_bindgen::JsValue;
+use web_sys::js_sys::Reflect;
+
 use shared::log;
 
 use crate::fiber::{FiberNode, StateNode};
@@ -10,7 +13,6 @@ use crate::host_config::get_host_config;
 use crate::work_tags::WorkTag;
 
 fn append_all_children(parent: Rc<dyn Any>, work_in_progress: Rc<RefCell<FiberNode>>) {
-    let host_config = get_host_config();
     let work_in_progress = work_in_progress.clone();
     let mut node = work_in_progress.borrow().child.clone();
     while node.is_some() {
@@ -21,12 +23,10 @@ fn append_all_children(parent: Rc<dyn Any>, work_in_progress: Rc<RefCell<FiberNo
                 // StateNode::FiberRootNode(_) => {}
                 // _ => {}
                 None => {}
-                Some(state_node) => {
-                    match &**state_node {
-                        StateNode::FiberRootNode(_) => {}
-                        _ => {}
-                    }
-                }
+                Some(state_node) => match &**state_node {
+                    StateNode::FiberRootNode(_) => {}
+                    _ => {}
+                },
             }
             // parent.downcast()::
             // host_config.append_initial_child(parent, )
@@ -83,27 +83,31 @@ fn bubble_properties(complete_work: Rc<RefCell<FiberNode>>) {
         let mut child = complete_work.clone().borrow().child.clone();
         while child.is_some() {
             let child_rc = child.clone().unwrap().clone();
-            let child_borrowed = child_rc.borrow();
-            subtree_flags |= child_borrowed.subtree_flags.clone();
-            subtree_flags |= child_borrowed.flags.clone();
-
-            child_rc.borrow_mut()._return = Some(Rc::downgrade(&complete_work));
-            child = child_borrowed.sibling.clone();
+            {
+                let child_borrowed = child_rc.borrow();
+                subtree_flags |= child_borrowed.subtree_flags.clone();
+                subtree_flags |= child_borrowed.flags.clone();
+            }
+            {
+                child_rc.borrow_mut()._return = Some(Rc::downgrade(&complete_work));
+            }
+            child = child_rc.borrow().sibling.clone();
         }
     }
-
 
     complete_work.clone().borrow_mut().subtree_flags |= subtree_flags.clone();
 }
 
 pub fn complete_work(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
+    let new_props = { work_in_progress.clone().borrow().pending_props.clone() };
     let host_config = get_host_config();
-    let tag = {
-        work_in_progress.clone().borrow().tag.clone()
-    };
+    let tag = { work_in_progress.clone().borrow().tag.clone() };
     match tag {
         WorkTag::FunctionComponent => {
-            log!("complete unknown fibler.tag {:?}", work_in_progress.clone().borrow().tag);
+            log!(
+                "complete unknown fibler.tag {:?}",
+                work_in_progress.clone().borrow().tag
+            );
             None
         }
         WorkTag::HostRoot => {
@@ -123,10 +127,22 @@ pub fn complete_work(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefC
                     .unwrap(),
             );
             append_all_children(instance.clone(), work_in_progress.clone());
-            work_in_progress.clone().borrow_mut().state_node = Some(Rc::new(StateNode::Element(instance.clone())));
+            work_in_progress.clone().borrow_mut().state_node =
+                Some(Rc::new(StateNode::Element(instance.clone())));
             bubble_properties(work_in_progress.clone());
             None
         }
-        _ => todo!()
+        WorkTag::HostText => {
+            let text_instance = host_config.create_text_instance(
+                Reflect::get(&new_props.unwrap(), &JsValue::from_str("content"))
+                    .unwrap()
+                    .as_string()
+                    .unwrap(),
+            );
+            work_in_progress.clone().borrow_mut().state_node =
+                Some(Rc::new(StateNode::Element(text_instance.clone())));
+            bubble_properties(work_in_progress.clone());
+            None
+        }
     }
 }

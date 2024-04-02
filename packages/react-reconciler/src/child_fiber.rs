@@ -57,19 +57,8 @@ fn _reconcile_child_fibers(
 ) -> Option<Rc<RefCell<FiberNode>>> {
     if (new_child.is_some()) {
         let new_child = Rc::clone(&new_child.unwrap());
-        let _typeof = Rc::clone(&derive_from_js_value(new_child.clone(), "_typeof").unwrap())
-            .as_string()
-            .unwrap();
-        if _typeof == REACT_ELEMENT {
-            return Some(place_single_child(
-                reconcile_single_element(
-                    return_fiber,
-                    current_first_child,
-                    Some(new_child.clone()),
-                ),
-                should_track_effect,
-            ));
-        } else if new_child.is_string() {
+
+        if new_child.is_string() {
             return Some(place_single_child(
                 reconcile_single_text_node(
                     return_fiber,
@@ -78,6 +67,20 @@ fn _reconcile_child_fibers(
                 ),
                 should_track_effect,
             ));
+        } else if new_child.is_object() {
+            let _typeof = Rc::clone(&derive_from_js_value(new_child.clone(), "_typeof").unwrap())
+                .as_string()
+                .unwrap();
+            if _typeof == REACT_ELEMENT {
+                return Some(place_single_child(
+                    reconcile_single_element(
+                        return_fiber,
+                        current_first_child,
+                        Some(new_child.clone()),
+                    ),
+                    should_track_effect,
+                ));
+            }
         }
     }
     log!("reconcile 时未实现的 child 类型");

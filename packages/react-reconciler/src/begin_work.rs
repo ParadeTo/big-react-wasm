@@ -37,23 +37,28 @@ pub fn update_host_component(
     work_in_progress: Rc<RefCell<FiberNode>>,
 ) -> Option<Rc<RefCell<FiberNode>>> {
     let work_in_progress = Rc::clone(&work_in_progress);
-    let ref_fiber_node = work_in_progress.borrow();
-    let next_children =
-        derive_from_js_value(ref_fiber_node.pending_props.clone().unwrap(), "children");
+
+    let next_children = {
+        let ref_fiber_node = work_in_progress.borrow();
+        derive_from_js_value(ref_fiber_node.pending_props.clone().unwrap(), "children")
+    };
+
 
     log!("{:?}", next_children);
-    reconcile_children(work_in_progress.clone(), next_children);
+    {
+        reconcile_children(work_in_progress.clone(), next_children);
+    }
     work_in_progress.clone().borrow().child.clone()
 }
 
 pub fn reconcile_children(work_in_progress: Rc<RefCell<FiberNode>>, children: Option<Rc<JsValue>>) {
     let work_in_progress = Rc::clone(&work_in_progress);
-    let current = work_in_progress.borrow().alternate.clone();
+    let current = { work_in_progress.borrow().alternate.clone() };
     if current.is_some() {
         // update
         work_in_progress.borrow_mut().child = reconcile_child_fibers(
             work_in_progress.clone(),
-            current.clone().unwrap().upgrade(),
+            current.clone(),
             children,
         )
     } else {

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,9 +13,7 @@ pub struct CommitWork {
 
 impl CommitWork {
     pub fn new() -> Self {
-        Self {
-            next_effect: None
-        }
+        Self { next_effect: None }
     }
     pub fn commit_mutation_effects(&mut self, finished_work: Option<Rc<RefCell<FiberNode>>>) {
         self.next_effect = finished_work.clone();
@@ -28,12 +27,25 @@ impl CommitWork {
             } else {
                 while self.next_effect.is_some() {
                     self.commit_mutation_effects_on_fiber(self.next_effect.clone().unwrap());
-                    let sibling = self.next_effect.clone().clone().unwrap().borrow().sibling.clone();
+                    let sibling = self
+                        .next_effect
+                        .clone()
+                        .clone()
+                        .unwrap()
+                        .borrow()
+                        .sibling
+                        .clone();
                     if sibling.is_some() {
                         self.next_effect = sibling;
                         break;
                     }
-                    self.next_effect = next_effect.clone().borrow()._return.clone().unwrap().upgrade();
+                    self.next_effect = next_effect
+                        .clone()
+                        .borrow()
+                        ._return
+                        .clone()
+                        .unwrap()
+                        .upgrade();
                 }
             }
         }
@@ -56,13 +68,15 @@ impl CommitWork {
                 .unwrap()
                 .clone()
                 .borrow()
-                .state_node.clone(),
+                .state_node
+                .clone(),
             WorkTag::HostComponent => host_parent
                 .clone()
                 .unwrap()
                 .clone()
                 .borrow()
-                .state_node.clone(),
+                .state_node
+                .clone(),
             WorkTag::HostText => todo!(),
         };
 
@@ -71,12 +85,29 @@ impl CommitWork {
         }
     }
 
-    fn append_placement_node_into_container(&self, fiber: Rc<RefCell<FiberNode>>, parent: Option<Rc<StateNode>>) {
+    fn get_element_from_state_node(&self, state_node: Rc<StateNode>) -> Rc<dyn Any> {
+        match &*state_node {
+            StateNode::FiberRootNode(_) => todo!(),
+            StateNode::Element(ele) => {
+                return ele.clone();
+            }
+        }
+    }
+
+    fn append_placement_node_into_container(
+        &self,
+        fiber: Rc<RefCell<FiberNode>>,
+        parent: Option<Rc<StateNode>>,
+    ) {
         let fiber = fiber.clone();
         let host_config = get_host_config();
         let tag = fiber.borrow().tag.clone();
         if tag == WorkTag::HostComponent || tag == WorkTag::HostText {
-            host_config.append_child_to_container(Rc::new(fiber.clone().borrow().state_node.clone()), parent.clone().unwrap());
+            let state_node = fiber.clone().borrow().state_node.clone().unwrap();
+            host_config.append_child_to_container(
+                self.get_element_from_state_node(state_node),
+                self.get_element_from_state_node(parent.clone().unwrap()),
+            );
             return;
         }
 
