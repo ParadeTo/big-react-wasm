@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 
 console.log(dayjs())
 // @ts-ignore
-const a = <div>hello</div>
+const a = <p>hello world</p>
 console.log(a)
 const root = createRoot(document.getElementById('root')!)
 

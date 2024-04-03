@@ -5,7 +5,7 @@ use wasm_bindgen::JsValue;
 
 use shared::{derive_from_js_value, log};
 
-use crate::child_fiber::reconcile_child_fibers;
+use crate::child_fiber::{mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::FiberNode;
 use crate::update_queue::process_update_queue;
 use crate::work_tags::WorkTag;
@@ -63,7 +63,7 @@ pub fn reconcile_children(work_in_progress: Rc<RefCell<FiberNode>>, children: Op
         )
     } else {
         // mount
-        work_in_progress.borrow_mut().child = reconcile_child_fibers(
+        work_in_progress.borrow_mut().child = mount_child_fibers(
             work_in_progress.clone(),
             None,
             children,

@@ -17,13 +17,21 @@ pub struct CommitWork {
 
 impl CommitWork {
     pub fn new(host_config: Arc<dyn HostConfig>) -> Self {
-        Self { next_effect: None, host_config }
+        Self {
+            next_effect: None,
+            host_config,
+        }
     }
     pub fn commit_mutation_effects(&mut self, finished_work: Rc<RefCell<FiberNode>>) {
         self.next_effect = Some(finished_work);
         while self.next_effect.is_some() {
             let next_effect = self.next_effect.clone().unwrap().clone();
             let child = next_effect.borrow().child.clone();
+            log!(
+                "commit_mutation_effects - subtree_flags {:?} {:?}",
+                next_effect.borrow().subtree_flags.clone(),
+                get_mutation_mask().contains(next_effect.borrow().subtree_flags.clone())
+            );
             if child.is_some()
                 && get_mutation_mask().contains(next_effect.borrow().subtree_flags.clone())
             {
@@ -36,6 +44,7 @@ impl CommitWork {
                 self.next_effect = child;
             } else {
                 while self.next_effect.is_some() {
+                    log!("commit_mutation_effects up loop");
                     self.commit_mutation_effects_on_fiber(self.next_effect.clone().unwrap());
                     let sibling = self
                         .next_effect
@@ -49,16 +58,24 @@ impl CommitWork {
                         self.next_effect = sibling;
                         break;
                     }
-                    self.next_effect = next_effect
+
+                    let _return = self
+                        .next_effect
+                        .clone()
+                        .unwrap()
                         .clone()
                         .borrow()
                         ._return
-                        .clone()
-                        .unwrap()
-                        .upgrade();
+                        .clone();
+                    if _return.is_none() {
+                        self.next_effect = None
+                    } else {
+                        self.next_effect = _return.clone().unwrap().upgrade();
+                    }
                 }
             }
         }
+        log!("commit_mutation_effects finish");
     }
 
     fn commit_mutation_effects_on_fiber(&self, finished_work: Rc<RefCell<FiberNode>>) {
@@ -77,18 +94,22 @@ impl CommitWork {
         let parent_state_node = FiberNode::derive_state_node(host_parent.unwrap());
 
         if parent_state_node.is_some() {
-            self.append_placement_node_into_container(finished_work.clone(), parent_state_node.unwrap());
+            log!(
+                "commit_placement - {:?} {:?}",
+                finished_work.clone().borrow().tag,
+                parent_state_node.clone().unwrap()
+            );
+            self.append_placement_node_into_container(
+                finished_work.clone(),
+                parent_state_node.unwrap(),
+            );
         }
     }
 
     fn get_element_from_state_node(&self, state_node: Rc<StateNode>) -> Rc<dyn Any> {
         match &*state_node {
-            StateNode::FiberRootNode(root) => {
-                root.clone().borrow().container.clone()
-            }
-            StateNode::Element(ele) => {
-                ele.clone()
-            }
+            StateNode::FiberRootNode(root) => root.clone().borrow().container.clone(),
+            StateNode::Element(ele) => ele.clone(),
         }
     }
 
@@ -103,7 +124,7 @@ impl CommitWork {
             let state_node = fiber.clone().borrow().state_node.clone().unwrap();
             self.host_config.append_child_to_container(
                 self.get_element_from_state_node(state_node),
-                parent,
+                parent.clone(),
             );
             return;
         }

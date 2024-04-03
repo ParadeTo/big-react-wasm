@@ -153,6 +153,7 @@ impl CompleteWork {
                 work_in_progress.clone().borrow_mut().state_node =
                     Some(Rc::new(StateNode::Element(text_instance.clone())));
                 self.bubble_properties(work_in_progress.clone());
+                // log!("host text flags", work_in_progress.clone().borrow().subtree_flags)
                 None
             }
         }
