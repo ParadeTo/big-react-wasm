@@ -1,8 +1,9 @@
+use std::sync::Arc;
+
 use wasm_bindgen::prelude::*;
 
 use react_reconciler::create_container;
-use react_reconciler::host_config::{get_host_config, init_host_config};
-use shared::log;
+use react_reconciler::host_config::init_host_config;
 
 use crate::host_config::DomHostConfig;
 use crate::renderer::DomRenderer;
@@ -23,9 +24,7 @@ pub fn create_root(container: &JsValue) -> DomRenderer {
     set_panic_hook();
     let root = create_container(container);
     let renderer = DomRenderer::new(root);
-    init_host_config(Box::new(DomHostConfig));
-    let a = get_host_config();
-    log!("{:?}", a.create_instance("div".to_string()));
+    init_host_config(Arc::new(DomHostConfig));
     renderer
 }
 

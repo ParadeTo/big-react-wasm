@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::rc::Rc;
-use std::sync::{Mutex, MutexGuard, Once};
+use std::sync::{Arc, Mutex, MutexGuard, Once};
 
 use once_cell::sync::OnceCell;
 
@@ -15,15 +15,15 @@ pub trait Ele {}
 
 static INIT: Once = Once::new();
 
-static HOST_CONFIG: OnceCell<Mutex<Box<dyn HostConfig + Send + Sync>>> = OnceCell::new();
+static HOST_CONFIG: OnceCell<Mutex<Arc<dyn HostConfig + Send + Sync>>> = OnceCell::new();
 
-pub fn init_host_config(renderer: Box<dyn HostConfig + Send + Sync>) {
+pub fn init_host_config(renderer: Arc<dyn HostConfig + Send + Sync>) {
     INIT.call_once(|| {
         let instance = Mutex::new(renderer);
         HOST_CONFIG.set(instance);
     });
 }
 
-pub fn get_host_config() -> MutexGuard<'static, Box<dyn HostConfig + Send + Sync>> {
+pub fn get_host_config() -> MutexGuard<'static, Arc<dyn HostConfig + Send + Sync>> {
     HOST_CONFIG.get().unwrap().lock().unwrap()
 }

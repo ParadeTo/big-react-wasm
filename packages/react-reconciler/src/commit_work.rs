@@ -1,28 +1,38 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+
+use shared::log;
 
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::{Flags, get_mutation_mask};
-use crate::host_config::get_host_config;
+use crate::host_config::HostConfig;
 use crate::work_tags::WorkTag;
 
 pub struct CommitWork {
     next_effect: Option<Rc<RefCell<FiberNode>>>,
+    host_config: Arc<dyn HostConfig>,
 }
 
 impl CommitWork {
-    pub fn new() -> Self {
-        Self { next_effect: None }
+    pub fn new(host_config: Arc<dyn HostConfig>) -> Self {
+        Self { next_effect: None, host_config }
     }
-    pub fn commit_mutation_effects(&mut self, finished_work: Option<Rc<RefCell<FiberNode>>>) {
-        self.next_effect = finished_work.clone();
+    pub fn commit_mutation_effects(&mut self, finished_work: Rc<RefCell<FiberNode>>) {
+        self.next_effect = Some(finished_work);
         while self.next_effect.is_some() {
             let next_effect = self.next_effect.clone().unwrap().clone();
             let child = next_effect.borrow().child.clone();
             if child.is_some()
                 && get_mutation_mask().contains(next_effect.borrow().subtree_flags.clone())
             {
+                log!(
+                    "commit_mutation_effects - {:?} {:?}",
+                    next_effect.clone().borrow().tag,
+                    child.clone().unwrap().clone().borrow().tag
+                );
+
                 self.next_effect = child;
             } else {
                 while self.next_effect.is_some() {
@@ -61,35 +71,23 @@ impl CommitWork {
 
     fn commit_placement(&self, finished_work: Rc<RefCell<FiberNode>>) {
         let host_parent = self.get_host_parent(finished_work.clone());
-        let parent_state_node = match host_parent.clone().unwrap().clone().borrow().tag.clone() {
-            WorkTag::FunctionComponent => todo!(),
-            WorkTag::HostRoot => host_parent
-                .clone()
-                .unwrap()
-                .clone()
-                .borrow()
-                .state_node
-                .clone(),
-            WorkTag::HostComponent => host_parent
-                .clone()
-                .unwrap()
-                .clone()
-                .borrow()
-                .state_node
-                .clone(),
-            WorkTag::HostText => todo!(),
-        };
+        if host_parent.is_none() {
+            return;
+        }
+        let parent_state_node = FiberNode::derive_state_node(host_parent.unwrap());
 
         if parent_state_node.is_some() {
-            self.append_placement_node_into_container(finished_work.clone(), parent_state_node);
+            self.append_placement_node_into_container(finished_work.clone(), parent_state_node.unwrap());
         }
     }
 
     fn get_element_from_state_node(&self, state_node: Rc<StateNode>) -> Rc<dyn Any> {
         match &*state_node {
-            StateNode::FiberRootNode(_) => todo!(),
+            StateNode::FiberRootNode(root) => {
+                root.clone().borrow().container.clone()
+            }
             StateNode::Element(ele) => {
-                return ele.clone();
+                ele.clone()
             }
         }
     }
@@ -97,16 +95,15 @@ impl CommitWork {
     fn append_placement_node_into_container(
         &self,
         fiber: Rc<RefCell<FiberNode>>,
-        parent: Option<Rc<StateNode>>,
+        parent: Rc<dyn Any>,
     ) {
         let fiber = fiber.clone();
-        let host_config = get_host_config();
         let tag = fiber.borrow().tag.clone();
         if tag == WorkTag::HostComponent || tag == WorkTag::HostText {
             let state_node = fiber.clone().borrow().state_node.clone().unwrap();
-            host_config.append_child_to_container(
+            self.host_config.append_child_to_container(
                 self.get_element_from_state_node(state_node),
-                self.get_element_from_state_node(parent.clone().unwrap()),
+                parent,
             );
             return;
         }

@@ -7,21 +7,25 @@ use shared::log;
 
 use crate::begin_work::begin_work;
 use crate::commit_work::CommitWork;
-use crate::complete_work::complete_work;
+use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::fiber_flags::get_mutation_mask;
+use crate::host_config::get_host_config;
 use crate::work_tags::WorkTag;
 
 static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
 
 pub struct WorkLoop {
     work_in_progress: Option<Rc<RefCell<FiberNode>>>,
+    complete_work: CompleteWork,
 }
 
 impl WorkLoop {
     pub fn new() -> Self {
+        let host_config = get_host_config();
         Self {
             work_in_progress: None,
+            complete_work: CompleteWork::new((*host_config).clone()),
         }
     }
     pub fn schedule_update_on_fiber(&mut self, fiber: Rc<RefCell<FiberNode>>) {
@@ -30,15 +34,12 @@ impl WorkLoop {
             return;
         }
         log!(
-            "schedule_update_on_fiber - update_queue: {:?}",
+            "schedule_update_on_fiber - root container: {:?}",
             root.clone()
                 .unwrap()
                 .clone()
                 .borrow()
-                .current
-                .clone()
-                .borrow()
-                .update_queue
+                .container
         );
 
         self.ensure_root_is_scheduled(root.unwrap())
@@ -146,9 +147,9 @@ impl WorkLoop {
             subtree_has_effect,
             root_has_effect
         );
-        let mut commit_work = &mut CommitWork::new();
+        let mut commit_work = &mut CommitWork::new(self.complete_work.host_config.clone());
         if subtree_has_effect || root_has_effect {
-            commit_work.commit_mutation_effects(root.borrow().finished_work.clone());
+            commit_work.commit_mutation_effects(finished_work.clone());
             cloned.borrow_mut().current = finished_work.clone();
         } else {
             cloned.borrow_mut().current = finished_work.clone();
@@ -164,7 +165,7 @@ impl WorkLoop {
         ));
 
         log!(
-            "prepare_fresh_stack - alternate {:?}",
+            "prepare_fresh_stack - state_node {:?}",
             root.clone()
                 .borrow()
                 .current
@@ -187,7 +188,6 @@ impl WorkLoop {
             );
             self.perform_unit_of_work(self.work_in_progress.clone().unwrap());
         }
-        log!("finish work loop")
     }
 
     fn perform_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) {
@@ -208,7 +208,7 @@ impl WorkLoop {
         let mut node: Option<Rc<RefCell<FiberNode>>> = Some(fiber);
 
         loop {
-            let next = complete_work(node.clone().unwrap().clone());
+            let next = self.complete_work.complete_work(node.clone().unwrap().clone());
 
             if next.is_some() {
                 self.work_in_progress = next.clone();

@@ -1,8 +1,7 @@
 use std::any::Any;
-use std::ops::Deref;
 use std::rc::Rc;
 
-use web_sys::{Element, window};
+use web_sys::{Element, Text, window};
 
 use react_reconciler::host_config::HostConfig;
 use shared::log;
@@ -13,6 +12,7 @@ impl HostConfig for DomHostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any> {
         let window = window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
+        log!("create_text_instance - {:?}", content.as_str());
         Rc::new(document.create_text_node(content.as_str()))
     }
 
@@ -27,10 +27,12 @@ impl HostConfig for DomHostConfig {
 
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>) {
         let parent = parent.downcast::<Element>().unwrap();
-        let child = child.downcast::<Element>().unwrap();
-        log!("append_initial_child - {:?} {:?}",parent, child);
-        match parent.append_child(child.deref()) {
-            Ok(_) => {}
+        let child = child.downcast::<Text>().unwrap();
+
+        match parent.append_child(&***child) {
+            Ok(_) => {
+                log!("append_initial_child successfully {:?} {:?}", parent, child);
+            }
             Err(_) => todo!()
         }
     }

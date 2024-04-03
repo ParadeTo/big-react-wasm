@@ -30,12 +30,12 @@ extern "C" {
 
 
 pub fn create_container(container: &JsValue) -> Rc<RefCell<FiberRootNode>> {
-    let host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot, None, None)));
+    let host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot, None, Some("ayouroot".to_string()))));
     host_root_fiber.clone().borrow_mut().initialize_update_queue();
-    let root = Rc::new(RefCell::new(FiberRootNode::new(Box::new(container.clone()), host_root_fiber.clone())));
+    let root = Rc::new(RefCell::new(FiberRootNode::new(Rc::new(container.clone()), host_root_fiber.clone())));
     let r1 = root.clone();
     host_root_fiber.borrow_mut().state_node = Some(Rc::new(StateNode::FiberRootNode(r1)));
-    log!("create_container, {:?}", root.clone().borrow().current.clone().borrow().tag);
+    log!("create_container, state_node {:?}", FiberNode::derive_state_node(host_root_fiber));
     root.clone()
 }
 
@@ -43,7 +43,7 @@ pub fn update_container(element: Rc<JsValue>, root: Rc<RefCell<FiberRootNode>>) 
     let host_root_fiber = Rc::clone(&root).borrow().current.clone();
     let update = create_update(element);
     enqueue_update(host_root_fiber.borrow(), update);
-    log!("update_queue, {:?}", host_root_fiber.borrow().update_queue);
+    log!("update_container, state_node {:?}", FiberNode::derive_state_node(host_root_fiber.clone()));
 
     let mut work_loop = WorkLoop::new();
     work_loop.schedule_update_on_fiber(host_root_fiber);

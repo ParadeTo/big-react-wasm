@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use react_reconciler::fiber::FiberRootNode;
 use react_reconciler::update_container;
+use shared::log;
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -37,7 +38,7 @@ impl DomRenderer {
         // if b.value_of() == c.value_of() {
         //     log!("equal");
         // }
-
+        log!("render state_node {:?}", self.root.clone().borrow().container);
         update_container(Rc::new(element.clone()), self.root.clone())
     }
 }
