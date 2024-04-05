@@ -1,5 +1,1 @@
-pub struct REACT_ELEMENT_TYPE;
-
-// pub enum ElementType {
-//
-// }
+pub static REACT_ELEMENT_TYPE: &str = "react.element";
