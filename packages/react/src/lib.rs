@@ -8,11 +8,11 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
     let react_element = Object::new();
     Reflect::set(
         &react_element,
-        &"&&typeof".into(),
+        &"$$typeof".into(),
         &JsValue::from_str(REACT_ELEMENT_TYPE),
     )
         .expect("$$typeof panic");
-    Reflect::set(&react_element, &"type".into(), _type).expect("_type panic");
+    Reflect::set(&react_element, &"type".into(), _type).expect("type panic");
     Reflect::set(&react_element, &"key".into(), key).expect("key panic");
 
     let conf = config.dyn_ref::<Object>().unwrap();

@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use wasm_bindgen::prelude::*;
 
 use react_reconciler::Reconciler;
@@ -13,7 +15,7 @@ mod host_config;
 #[wasm_bindgen(js_name = createRoot)]
 pub fn create_root(container: &JsValue) -> Renderer {
     set_panic_hook();
-    let reconciler = Reconciler::new(Box::new(ReactDomHostConfig));
+    let reconciler = Reconciler::new(Rc::new(ReactDomHostConfig));
     let root = reconciler.create_container(container);
     let renderer = Renderer::new(root, reconciler);
     renderer
