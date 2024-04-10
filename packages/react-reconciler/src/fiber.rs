@@ -1,5 +1,7 @@
 use std::any::Any;
 use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
@@ -10,8 +12,6 @@ use shared::derive_from_js_value;
 use crate::fiber_flags::Flags;
 use crate::update_queue::{Update, UpdateQueue, UpdateType};
 use crate::work_tags::WorkTag;
-
-trait Node {}
 
 #[derive(Debug)]
 pub enum StateNode {
@@ -37,7 +37,6 @@ pub struct FiberNode {
     pub memoized_state: Option<Rc<JsValue>>,
 }
 
-impl Node for FiberNode {}
 
 impl FiberNode {
     pub fn new(tag: WorkTag, pending_props: Option<Rc<JsValue>>, key: Option<String>) -> Self {
@@ -152,14 +151,12 @@ impl FiberNode {
     }
 }
 
-#[derive(Debug)]
 pub struct FiberRootNode {
     pub container: Rc<JsValue>,
     pub current: Rc<RefCell<FiberNode>>,
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
 }
 
-impl Node for FiberRootNode {}
 
 impl FiberRootNode {
     pub fn new(container: Rc<JsValue>, host_root_fiber: Rc<RefCell<FiberNode>>) -> Self {
@@ -168,5 +165,28 @@ impl FiberRootNode {
             current: host_root_fiber,
             finished_work: None,
         }
+    }
+}
+
+impl Debug for FiberRootNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut root = self.current.clone().borrow().alternate.clone();
+        Ok(if let Some(node) = root {
+            let mut queue = VecDeque::new();
+            queue.push_back(Rc::clone(&node));
+
+            while let Some(current) = queue.pop_front() {
+                let current_ref = current.borrow();
+                writeln!(f, "{:?} -> ", current_ref.tag);
+                if let Some(ref child) = current_ref.child {
+                    queue.push_back(Rc::clone(child));
+                    let mut sibling = child.clone().borrow().sibling.clone();
+                    while sibling.is_some() {
+                        queue.push_back(Rc::clone(sibling.as_ref().unwrap()));
+                        sibling = sibling.as_ref().unwrap().clone().borrow().sibling.clone();
+                    }
+                }
+            }
+        })
     }
 }

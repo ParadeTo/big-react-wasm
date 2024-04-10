@@ -92,6 +92,7 @@ impl WorkLoop {
             break;
         }
 
+        log!("{:?}", *root)
         // commit
     }
 
@@ -118,6 +119,7 @@ impl WorkLoop {
 
         if next.is_none() {
             // self.complete_unit_of_work(fiber.clone())
+            self.work_in_progress = None;
         } else {
             log!(
                 "perform_unit_of_work - next {:?}",
