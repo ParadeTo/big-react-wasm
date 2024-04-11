@@ -47,13 +47,13 @@ impl WorkLoop {
         let mut parent = Rc::clone(&fiber).borrow()._return.clone();
 
         while parent.is_some() {
-            node = parent.clone().unwrap().upgrade().unwrap();
-            let rc = Rc::clone(&parent.unwrap().upgrade().unwrap());
+            node = parent.clone().unwrap();
+            let rc = Rc::clone(&parent.unwrap());
             let rc_ref = rc.borrow();
             let next = match rc_ref._return.as_ref() {
                 None => None,
                 Some(node) => {
-                    let a = Rc::downgrade(&node.upgrade().unwrap());
+                    let a = node.clone();
                     Some(a)
                 }
             };
@@ -92,7 +92,7 @@ impl WorkLoop {
             break;
         }
 
-        log!("{:?}", *root)
+        log!("{:?}", *root.clone().borrow());
         // commit
     }
 

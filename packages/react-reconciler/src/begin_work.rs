@@ -27,8 +27,6 @@ pub fn update_host_root(
     let next_children = work_in_progress.clone().borrow().memoized_state.clone();
     log!("tag {:?}", next_children);
     reconcile_children(work_in_progress.clone(), next_children);
-    log!("tag {:?}", work_in_progress.clone().borrow().child.clone());
-
     work_in_progress.clone().borrow().child.clone()
 }
 
@@ -42,7 +40,7 @@ pub fn update_host_component(
         let ref_fiber_node = work_in_progress.borrow();
         derive_from_js_value(ref_fiber_node.pending_props.clone().unwrap(), "children")
     };
-    
+
     {
         reconcile_children(work_in_progress.clone(), next_children);
     }

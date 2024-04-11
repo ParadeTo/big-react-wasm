@@ -3,9 +3,10 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
+use web_sys::js_sys::Reflect;
 
 use shared::derive_from_js_value;
 
@@ -26,7 +27,7 @@ pub struct FiberNode {
     key: Option<String>,
     pub state_node: Option<Rc<StateNode>>,
     pub update_queue: Option<Rc<RefCell<UpdateQueue>>>,
-    pub _return: Option<Weak<RefCell<FiberNode>>>,
+    pub _return: Option<Rc<RefCell<FiberNode>>>,
     pub sibling: Option<Rc<RefCell<FiberNode>>>,
     pub child: Option<Rc<RefCell<FiberNode>>>,
     pub alternate: Option<Rc<RefCell<FiberNode>>>,
@@ -36,7 +37,6 @@ pub struct FiberNode {
     pub memoized_props: JsValue,
     pub memoized_state: Option<Rc<JsValue>>,
 }
-
 
 impl FiberNode {
     pub fn new(tag: WorkTag, pending_props: Option<Rc<JsValue>>, key: Option<String>) -> Self {
@@ -62,7 +62,7 @@ impl FiberNode {
         let _type = derive_from_js_value(ele.clone(), "type");
         let key = match derive_from_js_value(ele.clone(), "key") {
             None => None,
-            Some(k) => k.as_string()
+            Some(k) => k.as_string(),
         };
         let props = derive_from_js_value(ele.clone(), "props");
 
@@ -80,7 +80,7 @@ impl FiberNode {
             None => {
                 return;
             }
-            Some(a) => a.clone()
+            Some(a) => a.clone(),
         };
 
         let mut u = update_queue.borrow_mut();
@@ -157,7 +157,6 @@ pub struct FiberRootNode {
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
 }
 
-
 impl FiberRootNode {
     pub fn new(container: Rc<JsValue>, host_root_fiber: Rc<RefCell<FiberNode>>) -> Self {
         Self {
@@ -177,13 +176,57 @@ impl Debug for FiberRootNode {
 
             while let Some(current) = queue.pop_front() {
                 let current_ref = current.borrow();
-                writeln!(f, "{:?} -> ", current_ref.tag);
+
+                match current_ref.tag {
+                    WorkTag::FunctionComponent => {
+                        write!(f, "{:?}", current.borrow()._type.as_ref().unwrap());
+                    }
+                    WorkTag::HostRoot => {
+                        write!(f, "{:?}", WorkTag::HostRoot);
+                    }
+                    WorkTag::HostComponent => {
+                        write!(f, "{:?}", current.borrow()._type.as_ref().unwrap().as_string().unwrap());
+                    }
+                    WorkTag::HostText => {
+                        write!(
+                            f,
+                            "{:?}",
+                            Reflect::get(
+                                current.borrow().pending_props.as_ref().unwrap(),
+                                &JsValue::from_str("content"),
+                            )
+                                .unwrap()
+                                .as_string()
+                                .unwrap(),
+                        );
+                    }
+                };
                 if let Some(ref child) = current_ref.child {
                     queue.push_back(Rc::clone(child));
                     let mut sibling = child.clone().borrow().sibling.clone();
                     while sibling.is_some() {
                         queue.push_back(Rc::clone(sibling.as_ref().unwrap()));
                         sibling = sibling.as_ref().unwrap().clone().borrow().sibling.clone();
+                    }
+                }
+
+                if let Some(next) = queue.front() {
+                    let next_ref = next.borrow();
+                    if let (Some(current_parent), Some(next_parent)) =
+                        (current_ref._return.as_ref(), next_ref._return.as_ref())
+                    {
+                        if !Rc::ptr_eq(current_parent, next_parent) {
+                            writeln!(f, "");
+                            writeln!(f, "------------------------------------");
+                            continue;
+                        }
+                    }
+
+                    if current_ref._return.is_some() {
+                        write!(f, ",");
+                    } else {
+                        writeln!(f, "");
+                        writeln!(f, "------------------------------------");
                     }
                 }
             }

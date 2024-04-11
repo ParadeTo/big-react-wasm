@@ -28,7 +28,7 @@ fn reconcile_single_element(
     element: Option<Rc<JsValue>>,
 ) -> Rc<RefCell<FiberNode>> {
     let mut fiber = FiberNode::create_fiber_from_element(element.unwrap());
-    fiber._return = Some(Rc::downgrade(&return_fiber));
+    fiber._return = Some(return_fiber.clone());
     Rc::new(RefCell::new(fiber))
 }
 
@@ -45,7 +45,7 @@ fn reconcile_single_text_node(
     )
         .expect("props panic");
     let mut created = FiberNode::new(WorkTag::HostText, Some(Rc::new(Object::into(props))), None);
-    created._return = Some(Rc::downgrade(&return_fiber.clone()));
+    created._return = Some(return_fiber.clone());
     Rc::new(RefCell::new(created))
 }
 
