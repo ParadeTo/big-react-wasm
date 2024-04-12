@@ -10,8 +10,6 @@ use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::HostConfig;
 use crate::work_tags::WorkTag;
 
-static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
-
 pub struct WorkLoop {
     work_in_progress: Option<Rc<RefCell<FiberNode>>>,
 }
@@ -22,6 +20,7 @@ impl WorkLoop {
             work_in_progress: None,
         }
     }
+
     pub fn schedule_update_on_fiber(&mut self, fiber: Rc<RefCell<FiberNode>>) {
         let root = self.mark_update_lane_from_fiber_to_root(fiber);
         if root.is_none() {
@@ -29,11 +28,7 @@ impl WorkLoop {
         }
         log!(
             "schedule_update_on_fiber - root container: {:?}",
-            root.clone()
-                .unwrap()
-                .clone()
-                .borrow()
-                .container
+            root.clone().unwrap().clone().borrow().container
         );
 
         self.ensure_root_is_scheduled(root.unwrap())
@@ -63,18 +58,20 @@ impl WorkLoop {
         let fiber_node_rc = Rc::clone(&node);
         let fiber_node = fiber_node_rc.borrow();
         if fiber_node.tag == WorkTag::HostRoot {
-            match fiber_node.state_node.clone() {
-                None => {}
-                Some(state_node) => {
-                    let state_node = state_node;
-                    return match &*state_node {
-                        StateNode::FiberRootNode(fiber_root_node) => {
-                            Some(Rc::clone(&fiber_root_node))
-                        }
-                        StateNode::Element(_) => todo!(),
-                    };
-                }
-            }
+            // match fiber_node.state_node.clone() {
+            //     None => {}
+            //     Some(state_node) => {
+            //         return match &*state_node {
+            //             StateNode::FiberRootNode(fiber_root_node) => {
+            //                 Some(Rc::clone(&fiber_root_node))
+            //             }
+            //             StateNode::Element(_) => todo!(),
+            //         };
+            //     }
+            // }
+            //
+            let Some(StateNode::FiberRootNode(fiber_root_node)) = fiber_node.state_node.clone();
+            return Some(Rc::clone(&fiber_root_node));
         }
 
         None

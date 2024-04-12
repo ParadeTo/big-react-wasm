@@ -34,7 +34,7 @@ pub struct FiberNode {
     pub _type: Option<Rc<JsValue>>,
     pub flags: Flags,
     pub subtree_flags: Flags,
-    pub memoized_props: JsValue,
+    pub memoized_props: Option<Rc<JsValue>>,
     pub memoized_state: Option<Rc<JsValue>>,
 }
 

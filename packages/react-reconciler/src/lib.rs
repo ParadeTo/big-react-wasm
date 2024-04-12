@@ -4,8 +4,6 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 
-use shared::log;
-
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::update_queue::{create_update, enqueue_update};
 use crate::work_loop::WorkLoop;
@@ -40,7 +38,6 @@ impl Reconciler {
         let root = Rc::new(RefCell::new(FiberRootNode::new(Rc::new(container.clone()), host_root_fiber.clone())));
         let r1 = root.clone();
         host_root_fiber.borrow_mut().state_node = Some(Rc::new(StateNode::FiberRootNode(r1)));
-        log!("create_container, state_node {:?}", FiberNode::derive_state_node(host_root_fiber));
         root.clone()
     }
 
@@ -48,8 +45,6 @@ impl Reconciler {
         let host_root_fiber = Rc::clone(&root).borrow().current.clone();
         let update = create_update(element);
         enqueue_update(host_root_fiber.borrow(), update);
-        log!("update_container, state_node {:?}", FiberNode::derive_state_node(host_root_fiber.clone()));
-
         let mut work_loop = WorkLoop::new(self.host_config.clone());
         work_loop.schedule_update_on_fiber(host_root_fiber);
     }
