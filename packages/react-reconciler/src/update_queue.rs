@@ -42,7 +42,7 @@ pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {
 }
 
 pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
-    let mut rc_fiber = fiber.clone();
+    let rc_fiber = fiber.clone();
     let mut fiber = rc_fiber.borrow_mut();
     let mut new_state = None;
     match fiber.update_queue.clone() {

@@ -51,7 +51,7 @@ impl FiberNode {
             child: None,
             alternate: None,
             _type: None,
-            memoized_props: JsValue::null(),
+            memoized_props: None,
             memoized_state: None,
             flags: Flags::NoFlags,
             subtree_flags: Flags::NoFlags,
@@ -185,14 +185,28 @@ impl Debug for FiberRootNode {
                         write!(f, "{:?}", WorkTag::HostRoot);
                     }
                     WorkTag::HostComponent => {
-                        write!(f, "{:?}", current.borrow()._type.as_ref().unwrap().as_string().unwrap());
-                    }
-                    WorkTag::HostText => {
+                        let current_borrowed = current.borrow();
                         write!(
                             f,
-                            "{:?}",
+                            "{:?}({:?})",
+                            current_borrowed
+                                ._type
+                                .as_ref()
+                                .unwrap()
+                                .as_string()
+                                .unwrap(),
+                            current_borrowed.state_node
+                        );
+                    }
+                    WorkTag::HostText => {
+                        let current_borrowed = current.borrow();
+
+                        write!(
+                            f,
+                            "{:?}({:?})",
+                            current_borrowed.tag,
                             Reflect::get(
-                                current.borrow().pending_props.as_ref().unwrap(),
+                                current_borrowed.pending_props.as_ref().unwrap(),
                                 &JsValue::from_str("content"),
                             )
                                 .unwrap()

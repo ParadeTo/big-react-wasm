@@ -6,18 +6,21 @@ use wasm_bindgen::JsValue;
 use shared::log;
 
 use crate::begin_work::begin_work;
+use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::HostConfig;
 use crate::work_tags::WorkTag;
 
 pub struct WorkLoop {
     work_in_progress: Option<Rc<RefCell<FiberNode>>>,
+    complete_work: CompleteWork,
 }
 
 impl WorkLoop {
     pub fn new(host_config: Rc<dyn HostConfig>) -> Self {
         Self {
             work_in_progress: None,
+            complete_work: CompleteWork::new(host_config),
         }
     }
 
@@ -70,8 +73,11 @@ impl WorkLoop {
             //     }
             // }
             //
-            let Some(StateNode::FiberRootNode(fiber_root_node)) = fiber_node.state_node.clone();
-            return Some(Rc::clone(&fiber_root_node));
+            if let Some(state_node) = fiber_node.state_node.clone() {
+                if let StateNode::FiberRootNode(fiber_root_node) = &*(state_node.clone()) {
+                    return Some(Rc::clone(fiber_root_node));
+                }
+            }
         }
 
         None
@@ -115,14 +121,45 @@ impl WorkLoop {
         let next = begin_work(fiber.clone());
 
         if next.is_none() {
-            // self.complete_unit_of_work(fiber.clone())
-            self.work_in_progress = None;
+            self.complete_unit_of_work(fiber.clone())
         } else {
             log!(
                 "perform_unit_of_work - next {:?}",
                 next.clone().unwrap().clone().borrow().tag
             );
             self.work_in_progress = Some(next.unwrap());
+        }
+    }
+
+    fn complete_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) {
+        let mut node: Option<Rc<RefCell<FiberNode>>> = Some(fiber);
+
+        loop {
+            let next = self
+                .complete_work
+                .complete_work(node.clone().unwrap().clone());
+
+            if next.is_some() {
+                self.work_in_progress = next.clone();
+                return;
+            }
+
+            let sibling = node.clone().unwrap().clone().borrow().sibling.clone();
+            if sibling.is_some() {
+                self.work_in_progress = next.clone();
+                return;
+            }
+
+            let _return = node.clone().unwrap().clone().borrow()._return.clone();
+
+            if _return.is_none() {
+                node = None;
+                self.work_in_progress = None;
+                break;
+            } else {
+                node = _return;
+                self.work_in_progress = node.clone();
+            }
         }
     }
 }

@@ -38,11 +38,7 @@ fn reconcile_single_text_node(
     content: Option<Rc<JsValue>>,
 ) -> Rc<RefCell<FiberNode>> {
     let props = Object::new();
-    Reflect::set(
-        &props,
-        &JsValue::from("content"),
-        &content.unwrap().clone(),
-    )
+    Reflect::set(&props, &JsValue::from("content"), &content.unwrap().clone())
         .expect("props panic");
     let mut created = FiberNode::new(WorkTag::HostText, Some(Rc::new(Object::into(props))), None);
     created._return = Some(return_fiber.clone());

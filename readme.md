@@ -13,3 +13,6 @@
 [从零实现 React v18，但 WASM 版 - [2] 实现 ReactElement](https://www.paradeto.com/2024/04/04/big-react-wasm-2/)
 
 [从零实现 React v18，但 WASM 版 - [3] Renderer 和 Reconciler 架构设计](https://www.paradeto.com/2024/04/07/big-react-wasm-3/)
+
+[从零实现 React v18，但 WASM 版 - [4] 实现 Render 流程的 beginWork 阶段](https://www.paradeto.com/2024/04/11/big-react-wasm-4/)
+
