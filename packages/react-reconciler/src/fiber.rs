@@ -51,7 +51,7 @@ impl FiberNode {
             child: None,
             alternate: None,
             _type: None,
-            memoized_props: JsValue::null(),
+            memoized_props: None,
             memoized_state: None,
             flags: Flags::NoFlags,
             subtree_flags: Flags::NoFlags,
