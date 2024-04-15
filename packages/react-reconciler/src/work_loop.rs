@@ -61,18 +61,6 @@ impl WorkLoop {
         let fiber_node_rc = Rc::clone(&node);
         let fiber_node = fiber_node_rc.borrow();
         if fiber_node.tag == WorkTag::HostRoot {
-            // match fiber_node.state_node.clone() {
-            //     None => {}
-            //     Some(state_node) => {
-            //         return match &*state_node {
-            //             StateNode::FiberRootNode(fiber_root_node) => {
-            //                 Some(Rc::clone(&fiber_root_node))
-            //             }
-            //             StateNode::Element(_) => todo!(),
-            //         };
-            //     }
-            // }
-            //
             if let Some(state_node) = fiber_node.state_node.clone() {
                 if let StateNode::FiberRootNode(fiber_root_node) = &*(state_node.clone()) {
                     return Some(Rc::clone(fiber_root_node));
