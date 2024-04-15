@@ -182,20 +182,20 @@ impl Debug for FiberRootNode {
                         write!(f, "{:?}", current.borrow()._type.as_ref().unwrap());
                     }
                     WorkTag::HostRoot => {
-                        write!(f, "{:?}", WorkTag::HostRoot);
+                        write!(f, "{:?}(flags: {:?})", WorkTag::HostRoot, current.borrow().flags);
                     }
                     WorkTag::HostComponent => {
                         let current_borrowed = current.borrow();
                         write!(
                             f,
-                            "{:?}({:?})",
+                            "{:?}(flags:{:?})",
                             current_borrowed
                                 ._type
                                 .as_ref()
                                 .unwrap()
                                 .as_string()
                                 .unwrap(),
-                            current_borrowed.state_node
+                            current_borrowed.flags
                         );
                     }
                     WorkTag::HostText => {
@@ -203,7 +203,7 @@ impl Debug for FiberRootNode {
 
                         write!(
                             f,
-                            "{:?}({:?})",
+                            "{:?}(state_node:{:?}, flags:{:?})",
                             current_borrowed.tag,
                             Reflect::get(
                                 current_borrowed.pending_props.as_ref().unwrap(),
@@ -212,6 +212,7 @@ impl Debug for FiberRootNode {
                                 .unwrap()
                                 .as_string()
                                 .unwrap(),
+                            current_borrowed.flags
                         );
                     }
                 };
