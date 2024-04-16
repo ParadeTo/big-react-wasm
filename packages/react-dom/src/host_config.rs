@@ -30,8 +30,6 @@ impl HostConfig for ReactDomHostConfig {
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>) {
         let p = parent.clone().downcast::<Node>().unwrap();
         let c = child.clone().downcast::<Node>().unwrap();
-        // let p = p.dyn_ref::<Node>().unwrap();
-        // let c = c.dyn_ref::<Node>().unwrap();
         match p.append_child(&c) {
             Ok(_) => {
                 log!("append_initial_child successfully jsvalue {:?} {:?}", p, child);
