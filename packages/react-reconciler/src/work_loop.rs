@@ -6,8 +6,10 @@ use wasm_bindgen::JsValue;
 use shared::log;
 
 use crate::begin_work::begin_work;
+use crate::commit_work::CommitWork;
 use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
+use crate::fiber_flags::get_mutation_mask;
 use crate::HostConfig;
 use crate::work_tags::WorkTag;
 
@@ -84,7 +86,46 @@ impl WorkLoop {
         }
 
         log!("{:?}", *root.clone().borrow());
-        // commit
+
+        let finished_work = {
+            root.clone()
+                .borrow()
+                .current
+                .clone()
+                .borrow()
+                .alternate
+                .clone()
+        };
+
+        root.clone().borrow_mut().finished_work = finished_work;
+        self.commit_root(root);
+    }
+
+    fn commit_root(&self, root: Rc<RefCell<FiberRootNode>>) {
+        let cloned = root.clone();
+        if cloned.borrow().finished_work.is_none() {
+            return;
+        }
+        let finished_work = cloned.borrow().finished_work.clone().unwrap();
+        cloned.borrow_mut().finished_work = None;
+
+        let subtree_has_effect = get_mutation_mask().contains(
+            finished_work
+                .clone()
+                .borrow()
+                .subtree_flags
+                .clone(),
+        );
+        let root_has_effect =
+            get_mutation_mask().contains(finished_work.clone().borrow().flags.clone());
+
+        let mut commit_work = &mut CommitWork::new(self.complete_work.host_config.clone());
+        if subtree_has_effect || root_has_effect {
+            commit_work.commit_mutation_effects(finished_work.clone());
+            cloned.borrow_mut().current = finished_work.clone();
+        } else {
+            cloned.borrow_mut().current = finished_work.clone();
+        }
     }
 
     fn prepare_fresh_stack(&mut self, root: Rc<RefCell<FiberRootNode>>) {

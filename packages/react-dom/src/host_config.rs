@@ -39,6 +39,6 @@ impl HostConfig for ReactDomHostConfig {
     }
 
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>) {
-        todo!()
+        self.append_initial_child(parent, child)
     }
 }

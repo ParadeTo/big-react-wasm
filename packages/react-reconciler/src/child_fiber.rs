@@ -4,7 +4,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::{Object, Reflect};
 
-use shared::{derive_from_js_value, log, REACT_ELEMENT_TYPE};
+use shared::{derive_from_js_value, REACT_ELEMENT_TYPE};
 
 use crate::fiber::FiberNode;
 use crate::fiber_flags::Flags;
@@ -64,23 +64,23 @@ fn _reconcile_child_fibers(
                 should_track_effect,
             ));
         } else if new_child.is_object() {
-            log!("{:?}", new_child);
-            let _typeof = Rc::clone(&derive_from_js_value(new_child.clone(), "$$typeof").unwrap())
-                .as_string()
-                .unwrap();
-            if _typeof == REACT_ELEMENT_TYPE {
-                return Some(place_single_child(
-                    reconcile_single_element(
-                        return_fiber,
-                        current_first_child,
-                        Some(new_child.clone()),
-                    ),
-                    should_track_effect,
-                ));
+            if let Some(_typeof) =
+                Rc::clone(&derive_from_js_value(new_child.clone(), "$$typeof").unwrap()).as_string()
+            {
+                if _typeof == REACT_ELEMENT_TYPE {
+                    return Some(place_single_child(
+                        reconcile_single_element(
+                            return_fiber,
+                            current_first_child,
+                            Some(new_child.clone()),
+                        ),
+                        should_track_effect,
+                    ));
+                }
             }
         }
     }
-    log!("Unsupported child type when reconcile");
+    todo!("Unsupported child type when reconcile");
     return None;
 }
 
