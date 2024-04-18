@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 
-use shared::{derive_from_js_value, log};
+use shared::derive_from_js_value;
 
 use crate::child_fiber::{mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::FiberNode;
@@ -25,7 +25,6 @@ pub fn update_host_root(
 ) -> Option<Rc<RefCell<FiberNode>>> {
     process_update_queue(work_in_progress.clone());
     let next_children = work_in_progress.clone().borrow().memoized_state.clone();
-    log!("tag {:?}", next_children);
     reconcile_children(work_in_progress.clone(), next_children);
     work_in_progress.clone().borrow().child.clone()
 }

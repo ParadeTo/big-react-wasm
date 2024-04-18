@@ -31,11 +31,6 @@ impl WorkLoop {
         if root.is_none() {
             return;
         }
-        log!(
-            "schedule_update_on_fiber - root container: {:?}",
-            root.clone().unwrap().clone().borrow().container
-        );
-
         self.ensure_root_is_scheduled(root.unwrap())
     }
 
@@ -138,10 +133,6 @@ impl WorkLoop {
 
     fn work_loop(&mut self) {
         while self.work_in_progress.is_some() {
-            log!(
-                "work_loop - work_in_progress {:?}",
-                self.work_in_progress.clone().unwrap().clone().borrow().tag
-            );
             self.perform_unit_of_work(self.work_in_progress.clone().unwrap());
         }
     }
@@ -152,10 +143,6 @@ impl WorkLoop {
         if next.is_none() {
             self.complete_unit_of_work(fiber.clone())
         } else {
-            log!(
-                "perform_unit_of_work - next {:?}",
-                next.clone().unwrap().clone().borrow().tag
-            );
             self.work_in_progress = Some(next.unwrap());
         }
     }
