@@ -1,10 +1,11 @@
-
+import {useState} from 'react'
 
 
 function App() {
-  return (
-      <div>a</div>
-  )
+    const a = useState('d')
+    return (
+        <div>a</div>
+    )
 }
 
 export default App

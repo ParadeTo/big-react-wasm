@@ -4,6 +4,9 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 
+use react::current_dispatcher::{CURRENT_DISPATCHER, Dispatcher};
+use shared::log;
+
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::update_queue::{create_update, enqueue_update};
 use crate::work_loop::WorkLoop;
@@ -18,6 +21,7 @@ mod begin_work;
 mod child_fiber;
 mod complete_work;
 mod commit_work;
+mod fiber_hooks;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;
@@ -40,6 +44,7 @@ impl Reconciler {
         let root = Rc::new(RefCell::new(FiberRootNode::new(container.clone(), host_root_fiber.clone())));
         let r1 = root.clone();
         host_root_fiber.borrow_mut().state_node = Some(Rc::new(StateNode::FiberRootNode(r1)));
+        self.update_current_dispatcher();
         root.clone()
     }
 
@@ -49,6 +54,20 @@ impl Reconciler {
         enqueue_update(host_root_fiber.borrow(), update);
         let mut work_loop = WorkLoop::new(self.host_config.clone());
         work_loop.schedule_update_on_fiber(host_root_fiber);
+    }
+
+    pub fn update_current_dispatcher(&self) {
+        unsafe {
+            let use_state = || {
+                log!("use_state");
+                vec![JsValue::null(), JsValue::null()]
+            };
+            let use_callback = || {
+                log!("use_callback");
+            };
+            let b = Rc::new(Dispatcher::new(&use_state, &use_callback));
+            CURRENT_DISPATCHER.current = Some(b);
+        }
     }
 }
 
