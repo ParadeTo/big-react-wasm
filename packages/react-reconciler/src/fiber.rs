@@ -179,10 +179,22 @@ impl Debug for FiberRootNode {
 
                 match current_ref.tag {
                     WorkTag::FunctionComponent => {
-                        write!(f, "{:?}", current.borrow()._type.as_ref().unwrap());
+                        let current_borrowed = current.borrow();
+                        write!(
+                            f,
+                            "{:?}(flags:{:?}, subtreeFlags:{:?})",
+                            current_borrowed._type.as_ref().unwrap(),
+                            current_borrowed.flags,
+                            current_borrowed.subtree_flags
+                        );
                     }
                     WorkTag::HostRoot => {
-                        write!(f, "{:?}(subtreeFlags:{:?})", WorkTag::HostRoot, current_ref.subtree_flags);
+                        write!(
+                            f,
+                            "{:?}(subtreeFlags:{:?})",
+                            WorkTag::HostRoot,
+                            current_ref.subtree_flags
+                        );
                     }
                     WorkTag::HostComponent => {
                         let current_borrowed = current.borrow();

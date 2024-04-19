@@ -6,11 +6,11 @@ settings:
 
 dependencies:
   react:
-    specifier: file://../../dist/react
-    version: file:../../dist/react
+    specifier: file://../../packages/react/pkg/react
+    version: file:../../packages/react/pkg/react
   react-dom:
-    specifier: file://../../dist/react-dom
-    version: file:../../dist/react-dom
+    specifier: file://../../packages/react-dom/pkg/react-dom
+    version: file:../../packages/react-dom/pkg/react-dom
   vite-plugin-wasm:
     specifier: ^3.3.0
     version: 3.3.0(vite@5.2.2)
@@ -1832,12 +1832,12 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  file:../../dist/react:
-    resolution: {directory: ../../dist/react, type: directory}
-    name: react
+  file:../../packages/react-dom/pkg/react-dom:
+    resolution: {directory: ../../packages/react-dom/pkg/react-dom, type: directory}
+    name: react-dom
     dev: false
 
-  file:../../dist/react-dom:
-    resolution: {directory: ../../dist/react-dom, type: directory}
-    name: react-dom
+  file:../../packages/react/pkg/react:
+    resolution: {directory: ../../packages/react/pkg/react, type: directory}
+    name: react
     dev: false

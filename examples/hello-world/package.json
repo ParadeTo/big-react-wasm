@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "file://../../dist/react",
-    "react-dom": "file://../../dist/react-dom",
+    "react": "file://../../packages/react/pkg/react",
+    "react-dom": "file://../../packages/react-dom/pkg/react-dom",
     "vite-plugin-wasm": "^3.3.0"
   },
   "devDependencies": {
