@@ -76,8 +76,15 @@ impl WorkLoop {
         self.prepare_fresh_stack(Rc::clone(&root));
 
         loop {
-            self.work_loop();
-            break;
+            match self.work_loop() {
+                Ok(_) => {
+                    break;
+                }
+                Err(e) => {
+                    log!("work_loop error {:?}", e);
+                    self.work_in_progress = None;
+                }
+            };
         }
 
         log!("{:?}", *root.clone().borrow());
@@ -131,20 +138,22 @@ impl WorkLoop {
         ));
     }
 
-    fn work_loop(&mut self) {
+    fn work_loop(&mut self) -> Result<(), JsValue> {
         while self.work_in_progress.is_some() {
-            self.perform_unit_of_work(self.work_in_progress.clone().unwrap());
+            self.perform_unit_of_work(self.work_in_progress.clone().unwrap())?;
         }
+        Ok(())
     }
 
-    fn perform_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) {
-        let next = begin_work(fiber.clone());
+    fn perform_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) -> Result<(), JsValue> {
+        let next = begin_work(fiber.clone())?;
 
         if next.is_none() {
             self.complete_unit_of_work(fiber.clone())
         } else {
             self.work_in_progress = Some(next.unwrap());
         }
+        Ok(())
     }
 
     fn complete_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) {
