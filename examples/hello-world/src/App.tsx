@@ -1,11 +1,13 @@
+import dayjs from 'dayjs'
+
 function App() {
     return (
-        <div><Comp/></div>
+        <div><Comp>{dayjs().format()}</Comp></div>
     )
 }
 
 function Comp({children}) {
-    return <span>Hello world</span>
+    return <span><i>{`Hello world, ${children}`}</i></span>
 }
 
 export default App
