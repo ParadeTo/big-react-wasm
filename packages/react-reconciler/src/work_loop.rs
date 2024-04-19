@@ -81,7 +81,6 @@ impl WorkLoop {
                     break;
                 }
                 Err(e) => {
-                    log!("work_loop error {:?}", e);
                     self.work_in_progress = None;
                 }
             };
@@ -111,13 +110,8 @@ impl WorkLoop {
         let finished_work = cloned.borrow().finished_work.clone().unwrap();
         cloned.borrow_mut().finished_work = None;
 
-        let subtree_has_effect = get_mutation_mask().contains(
-            finished_work
-                .clone()
-                .borrow()
-                .subtree_flags
-                .clone(),
-        );
+        let subtree_has_effect =
+            get_mutation_mask().contains(finished_work.clone().borrow().subtree_flags.clone());
         let root_has_effect =
             get_mutation_mask().contains(finished_work.clone().borrow().flags.clone());
 
@@ -149,7 +143,7 @@ impl WorkLoop {
         let next = begin_work(fiber.clone())?;
 
         if next.is_none() {
-            self.complete_unit_of_work(fiber.clone())
+            self.complete_unit_of_work(fiber.clone());
         } else {
             self.work_in_progress = Some(next.unwrap());
         }

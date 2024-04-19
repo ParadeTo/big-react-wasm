@@ -1,7 +1,11 @@
 function App() {
     return (
-        <div>App</div>
+        <div><Comp/></div>
     )
+}
+
+function Comp({children}) {
+    return <span>Hello world</span>
 }
 
 export default App
