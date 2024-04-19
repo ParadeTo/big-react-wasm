@@ -81,6 +81,7 @@ impl WorkLoop {
                     break;
                 }
                 Err(e) => {
+                    log!("work_loop error {:?}", e);
                     self.work_in_progress = None;
                 }
             };
