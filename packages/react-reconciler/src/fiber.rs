@@ -152,13 +152,13 @@ impl FiberNode {
 }
 
 pub struct FiberRootNode {
-    pub container: Rc<JsValue>,
+    pub container: Rc<dyn Any>,
     pub current: Rc<RefCell<FiberNode>>,
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
 }
 
 impl FiberRootNode {
-    pub fn new(container: Rc<JsValue>, host_root_fiber: Rc<RefCell<FiberNode>>) -> Self {
+    pub fn new(container: Rc<dyn Any>, host_root_fiber: Rc<RefCell<FiberNode>>) -> Self {
         Self {
             container,
             current: host_root_fiber,

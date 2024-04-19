@@ -32,13 +32,13 @@ impl HostConfig for ReactDomHostConfig {
         let c = child.clone().downcast::<Node>().unwrap();
         match p.append_child(&c) {
             Ok(_) => {
-                log!("append_initial_child successfully jsvalue {:?} {:?}", p, child);
+                log!("append_initial_child successfully {:?} {:?}", p, c);
             }
             Err(_) => todo!(),
         }
     }
 
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>) {
-        todo!()
+        self.append_initial_child(parent, child)
     }
 }
