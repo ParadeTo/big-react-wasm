@@ -7,9 +7,7 @@
     "example": "examples"
   },
   "scripts": {
-    "build:react": "wasm-pack build packages/react --out-dir pkg/react --out-name jsx-dev-runtime",
-    "build:react-dom": "wasm-pack build packages/react-dom --out-dir pkg/react-dom --out-name index",
-    "build": "npm run build:react && npm run build:react-dom"
+    "build": "node scripts/build.js"
   },
   "author": "",
   "license": "ISC"
