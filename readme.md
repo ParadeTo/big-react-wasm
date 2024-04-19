@@ -16,3 +16,5 @@
 
 [从零实现 React v18，但 WASM 版 - [4] 实现 Render 流程的 beginWork 阶段](https://www.paradeto.com/2024/04/11/big-react-wasm-4/)
 
+[从零实现 React v18，但 WASM 版 - [5] 实现 Render 流程的 completeWork 阶段](https://www.paradeto.com/2024/04/15/big-react-wasm-5/)
+

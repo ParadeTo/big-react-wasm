@@ -5,8 +5,6 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::log;
-
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::Flags;
 use crate::HostConfig;
@@ -120,10 +118,7 @@ impl CompleteWork {
         let tag = { work_in_progress.clone().borrow().tag.clone() };
         match tag {
             WorkTag::FunctionComponent => {
-                log!(
-                    "complete unknown fibler.tag {:?}",
-                    work_in_progress.clone().borrow().tag
-                );
+                self.bubble_properties(work_in_progress.clone());
                 None
             }
             WorkTag::HostRoot => {

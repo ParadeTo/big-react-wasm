@@ -18,6 +18,7 @@ mod begin_work;
 mod child_fiber;
 mod complete_work;
 mod commit_work;
+mod fiber_hooks;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;

@@ -1,6 +1,6 @@
 import {createRoot} from 'react-dom'
+import App from './App.tsx'
 
-const comp = <div><p><span>Hello World</span></p></div>
 const root = createRoot(document.getElementById("root"))
-root.render(comp)
+root.render(<App/>)
 
