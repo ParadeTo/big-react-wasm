@@ -11,7 +11,6 @@ use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::Flags;
 use crate::HostConfig;
 use crate::work_tags::WorkTag;
-use crate::work_tags::WorkTag::HostText;
 
 pub struct CompleteWork {
     pub host_config: Rc<dyn HostConfig>,
@@ -28,21 +27,24 @@ impl CompleteWork {
         while node.is_some() {
             let node_unwrap = node.clone().unwrap();
             let n = node_unwrap.clone();
-            if n.borrow().tag == WorkTag::HostComponent || n.borrow().tag == HostText {
+            if n.borrow().tag == WorkTag::HostComponent || n.borrow().tag == WorkTag::HostText {
                 self.host_config.append_initial_child(
                     parent.clone(),
                     FiberNode::derive_state_node(node.clone().unwrap()).unwrap(),
                 )
             } else if n.borrow().child.is_some() {
                 let n = node_unwrap.clone();
-                let borrowed = n.borrow_mut();
-                borrowed
-                    .child
-                    .as_ref()
-                    .unwrap()
-                    .clone()
-                    .borrow_mut()
-                    ._return = Some(node_unwrap.clone());
+                {
+                    let borrowed = n.borrow_mut();
+                    borrowed
+                        .child
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .borrow_mut()
+                        ._return = Some(node_unwrap.clone());
+                }
+
                 node = node_unwrap.clone().borrow().child.clone();
                 continue;
             }
@@ -51,30 +53,41 @@ impl CompleteWork {
                 return;
             }
 
-            while node_unwrap.borrow().sibling.clone().is_none() {
-                if node_unwrap.borrow()._return.is_none()
+            while node
+                .clone()
+                .unwrap()
+                .clone()
+                .borrow()
+                .sibling
+                .clone()
+                .is_none()
+            {
+                let node_cloned = node.clone().unwrap().clone();
+                if node_cloned.borrow()._return.is_none()
                     || Rc::ptr_eq(
-                    &node_unwrap
-                        .borrow()
-                        ._return
-                        .as_ref()
-                        .unwrap(),
+                    &node_cloned.borrow()._return.as_ref().unwrap(),
                     &work_in_progress,
                 )
                 {
                     return;
                 }
 
-                node_unwrap
-                    .borrow_mut()
+                node = node_cloned.borrow()._return.clone();
+            }
+
+            {
+                node.clone()
+                    .unwrap()
+                    .borrow()
                     .sibling
                     .clone()
                     .unwrap()
                     .clone()
                     .borrow_mut()
                     ._return = node_unwrap.borrow()._return.clone();
-                node = node_unwrap.borrow().sibling.clone();
             }
+
+            node = node.clone().unwrap().borrow().sibling.clone();
         }
     }
 
