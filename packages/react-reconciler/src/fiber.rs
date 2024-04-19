@@ -182,22 +182,38 @@ impl Debug for FiberRootNode {
                         write!(f, "{:?}", current.borrow()._type.as_ref().unwrap());
                     }
                     WorkTag::HostRoot => {
-                        write!(f, "{:?}", WorkTag::HostRoot);
+                        write!(f, "{:?}(subtreeFlags:{:?})", WorkTag::HostRoot, current_ref.subtree_flags);
                     }
                     WorkTag::HostComponent => {
-                        write!(f, "{:?}", current.borrow()._type.as_ref().unwrap().as_string().unwrap());
-                    }
-                    WorkTag::HostText => {
+                        let current_borrowed = current.borrow();
                         write!(
                             f,
-                            "{:?}",
+                            "{:?}(flags:{:?}, subtreeFlags:{:?})",
+                            current_borrowed
+                                ._type
+                                .as_ref()
+                                .unwrap()
+                                .as_string()
+                                .unwrap(),
+                            current_borrowed.flags,
+                            current_borrowed.subtree_flags
+                        );
+                    }
+                    WorkTag::HostText => {
+                        let current_borrowed = current.borrow();
+
+                        write!(
+                            f,
+                            "{:?}(state_node:{:?}, flags:{:?})",
+                            current_borrowed.tag,
                             Reflect::get(
-                                current.borrow().pending_props.as_ref().unwrap(),
+                                current_borrowed.pending_props.as_ref().unwrap(),
                                 &JsValue::from_str("content"),
                             )
                                 .unwrap()
                                 .as_string()
                                 .unwrap(),
+                            current_borrowed.flags
                         );
                     }
                 };

@@ -16,6 +16,7 @@ mod update_queue;
 mod work_loop;
 mod begin_work;
 mod child_fiber;
+mod complete_work;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;
