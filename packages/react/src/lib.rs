@@ -1,23 +1,7 @@
-use std::rc::Rc;
-
 use js_sys::{Object, Reflect};
 use wasm_bindgen::prelude::*;
 
 use shared::REACT_ELEMENT_TYPE;
-
-use crate::current_dispatcher::{Dispatcher, resolve_dispatcher};
-
-pub mod current_dispatcher;
-
-struct MyStruct {
-    current: Option<Rc<Dispatcher>>,
-}
-
-impl MyStruct {
-    pub fn new(current: Option<Rc<Dispatcher>>) -> Self {
-        MyStruct { current }
-    }
-}
 
 #[wasm_bindgen(js_name = jsxDEV)]
 pub unsafe fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
@@ -52,9 +36,14 @@ pub unsafe fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsVal
 }
 
 
+#[wasm_bindgen]
+extern "C" {
+    fn useStateImpl() -> Vec<JsValue>;
+}
+
+
 #[wasm_bindgen(js_name = useState)]
 pub unsafe fn use_state() -> Vec<JsValue> {
-    let dispatcher = resolve_dispatcher();
-    (&*dispatcher.as_ref().use_state)()
+    useStateImpl()
 }
 

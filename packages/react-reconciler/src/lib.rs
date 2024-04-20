@@ -4,16 +4,13 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 
-use react::current_dispatcher::{CURRENT_DISPATCHER, Dispatcher};
-use shared::log;
-
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::update_queue::{create_update, enqueue_update};
 use crate::work_loop::WorkLoop;
 use crate::work_tags::WorkTag;
 
 pub mod fiber;
-mod fiber_flags;
+pub mod fiber_flags;
 mod work_tags;
 mod update_queue;
 mod work_loop;
@@ -22,6 +19,7 @@ mod child_fiber;
 mod complete_work;
 mod commit_work;
 mod fiber_hooks;
+mod current_dispatcher;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;
@@ -33,6 +31,7 @@ pub trait HostConfig {
 pub struct Reconciler {
     host_config: Rc<dyn HostConfig>,
 }
+
 
 impl Reconciler {
     pub fn new(host_config: Rc<dyn HostConfig>) -> Self {
@@ -48,30 +47,11 @@ impl Reconciler {
     }
 
     pub fn update_container(&self, element: Rc<JsValue>, root: Rc<RefCell<FiberRootNode>>) {
-        self.update_current_dispatcher();
-        
         let host_root_fiber = Rc::clone(&root).borrow().current.clone();
         let update = create_update(element);
         enqueue_update(host_root_fiber.borrow(), update);
         let mut work_loop = WorkLoop::new(self.host_config.clone());
         work_loop.schedule_update_on_fiber(host_root_fiber);
-    }
-
-    pub fn update_current_dispatcher(&self) {
-        unsafe {
-            let use_state = || {
-                log!("use_state");
-                vec![JsValue::null(), JsValue::null()]
-            };
-            let use_callback = || {
-                log!("use_callback");
-            };
-            let b = Rc::new(Dispatcher::new(&use_state, &use_callback));
-            CURRENT_DISPATCHER.current = Some(b);
-            let dispatcher = CURRENT_DISPATCHER.current.clone();
-
-            log!("dispatcher doesn't exist, {:?}", dispatcher);
-        }
     }
 }
 

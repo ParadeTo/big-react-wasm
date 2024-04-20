@@ -6,11 +6,10 @@ use web_sys::js_sys::Function;
 
 use shared::log;
 
-use crate::fiber::FiberNode;
+use crate::fiber::{FiberNode, MemoizedState};
 
 #[derive(Clone, Debug)]
 pub struct UpdateAction;
-
 
 #[derive(Clone, Debug)]
 pub struct Update {
@@ -22,15 +21,15 @@ pub struct UpdateType {
     pub pending: Option<Update>,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct UpdateQueue {
     pub shared: UpdateType,
 }
 
-
 pub fn create_update(action: Rc<JsValue>) -> Update {
-    Update { action: Some(action) }
+    Update {
+        action: Some(action),
+    }
 }
 
 pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {
@@ -60,8 +59,10 @@ pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
                     Some(action) => {
                         let f = action.dyn_ref::<Function>();
                         new_state = match f {
-                            None => Some(action.clone()),
-                            Some(f) => Some(Rc::new(f.call0(&JsValue::null()).unwrap())),
+                            None => Some(MemoizedState::JsValue(action.clone())),
+                            Some(f) => Some(MemoizedState::JsValue(Rc::new(
+                                f.call0(&JsValue::null()).unwrap(),
+                            ))),
                         }
                     }
                 }

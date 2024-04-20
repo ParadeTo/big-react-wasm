@@ -11,6 +11,7 @@ use web_sys::js_sys::Reflect;
 use shared::derive_from_js_value;
 
 use crate::fiber_flags::Flags;
+use crate::fiber_hooks::Hook;
 use crate::update_queue::{Update, UpdateQueue, UpdateType};
 use crate::work_tags::WorkTag;
 
@@ -18,6 +19,12 @@ use crate::work_tags::WorkTag;
 pub enum StateNode {
     FiberRootNode(Rc<RefCell<FiberRootNode>>),
     Element(Rc<dyn Any>),
+}
+
+#[derive(Debug, Clone)]
+pub enum MemoizedState {
+    JsValue(Rc<JsValue>),
+    Hook(Rc<RefCell<Hook>>),
 }
 
 #[derive(Debug)]
@@ -35,7 +42,7 @@ pub struct FiberNode {
     pub flags: Flags,
     pub subtree_flags: Flags,
     pub memoized_props: Option<Rc<JsValue>>,
-    pub memoized_state: Option<Rc<JsValue>>,
+    pub memoized_state: Option<MemoizedState>,
 }
 
 impl FiberNode {
