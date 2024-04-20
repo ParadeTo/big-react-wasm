@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen::prelude::{Closure, wasm_bindgen};
-use web_sys::js_sys::Function;
+use web_sys::js_sys::{Function, Object, Reflect};
 
 use shared::log;
 
@@ -37,6 +37,12 @@ impl Hook {
 static mut CURRENTLY_RENDERING_FIBER: Option<Rc<RefCell<FiberNode>>> = None;
 static mut WORK_IN_PROGRESS_HOOK: Option<Rc<RefCell<Hook>>> = None;
 
+
+#[wasm_bindgen]
+extern "C" {
+    fn updateDispatch(args: &JsValue);
+}
+
 pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsValue, JsValue> {
     unsafe { CURRENTLY_RENDERING_FIBER = Some(work_in_progress.clone()); }
 
@@ -56,7 +62,15 @@ pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsV
         };
         let b = Box::new(Dispatcher::new(&mount_state, &use_callback));
         unsafe {
-            CURRENT_DISPATCHER.current = Some(b);
+            let object = Object::new();
+            let closure = Closure::wrap(Box::new(mount_state) as Box<dyn Fn(&JsValue) -> Vec<JsValue>>);
+
+            let function = closure.as_ref().unchecked_ref::<Function>().clone();
+
+            // Don't forget to forget the closure or it will be cleaned up when it goes out of scope.
+            closure.forget();
+            Reflect::set(&object, &"use_state".into(), &function);
+            updateDispatch(&object.into());
         }
     }
 
@@ -128,6 +142,7 @@ fn mount_state(initial_state: &JsValue) -> Vec<JsValue> {
         function.into(),
     ];
 }
+
 
 fn dispatch_set_state1(fiber: Option<Rc<RefCell<FiberNode>>>) {
     log!("dispatch_set_state {:?}", fiber)
