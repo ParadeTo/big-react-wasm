@@ -7,19 +7,20 @@ use web_sys::js_sys::{Function, Object, Reflect};
 
 use shared::log;
 
-use crate::current_dispatcher::{CURRENT_DISPATCHER, Dispatcher};
 use crate::fiber::{FiberNode, MemoizedState};
-use crate::update_queue::UpdateQueue;
+use crate::update_queue::{create_update, create_update_queue, enqueue_update, UpdateQueue};
 
-//
-// use wasm_bindgen::JsValue;
-//
-// use crate::fiber::FiberNode;
-// use crate::update_queue::UpdateQueue;
-//
+#[wasm_bindgen]
+extern "C" {
+    fn updateDispatcher(args: &JsValue);
+}
+
+static mut CURRENTLY_RENDERING_FIBER: Option<Rc<RefCell<FiberNode>>> = None;
+static mut WORK_IN_PROGRESS_HOOK: Option<Rc<RefCell<Hook>>> = None;
+
 #[derive(Debug, Clone)]
 pub struct Hook {
-    memoized_state: Option<Rc<JsValue>>,
+    memoized_state: Option<MemoizedState>,
     update_queue: Option<Rc<RefCell<UpdateQueue>>>,
     next: Option<Rc<RefCell<Hook>>>,
 }
@@ -34,17 +35,21 @@ impl Hook {
     }
 }
 
-static mut CURRENTLY_RENDERING_FIBER: Option<Rc<RefCell<FiberNode>>> = None;
-static mut WORK_IN_PROGRESS_HOOK: Option<Rc<RefCell<Hook>>> = None;
+fn update_mount_hooks_to_dispatcher() {
+    let object = Object::new();
 
+    let closure = Closure::wrap(Box::new(mount_state) as Box<dyn Fn(&JsValue) -> Vec<JsValue>>);
+    let function = closure.as_ref().unchecked_ref::<Function>().clone();
+    closure.forget();
+    Reflect::set(&object, &"use_state".into(), &function).expect("TODO: panic set use_state");
 
-#[wasm_bindgen]
-extern "C" {
-    fn updateDispatch(args: &JsValue);
+    updateDispatcher(&object.into());
 }
 
 pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsValue, JsValue> {
-    unsafe { CURRENTLY_RENDERING_FIBER = Some(work_in_progress.clone()); }
+    unsafe {
+        CURRENTLY_RENDERING_FIBER = Some(work_in_progress.clone());
+    }
 
     let work_in_progress_cloned = work_in_progress.clone();
     {
@@ -52,26 +57,11 @@ pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsV
         work_in_progress_cloned.borrow_mut().update_queue = None;
     }
 
-
     let current = work_in_progress_cloned.borrow().alternate.clone();
     if current.is_some() {
         log!("还未实现update时renderWithHooks");
     } else {
-        let use_callback = || {
-            log!("use_callback");
-        };
-        let b = Box::new(Dispatcher::new(&mount_state, &use_callback));
-        unsafe {
-            let object = Object::new();
-            let closure = Closure::wrap(Box::new(mount_state) as Box<dyn Fn(&JsValue) -> Vec<JsValue>>);
-
-            let function = closure.as_ref().unchecked_ref::<Function>().clone();
-
-            // Don't forget to forget the closure or it will be cleaned up when it goes out of scope.
-            closure.forget();
-            Reflect::set(&object, &"use_state".into(), &function);
-            updateDispatch(&object.into());
-        }
+        update_mount_hooks_to_dispatcher();
     }
 
     let _type;
@@ -94,11 +84,21 @@ fn mount_work_in_progress_nook() -> Option<Rc<RefCell<Hook>>> {
             if CURRENTLY_RENDERING_FIBER.is_none() {
                 log!("WORK_IN_PROGRESS_HOOK and CURRENTLY_RENDERING_FIBER is empty")
             } else {
-                CURRENTLY_RENDERING_FIBER.as_ref().unwrap().clone().borrow_mut().memoized_state = Some(MemoizedState::Hook(hook.clone()));
+                CURRENTLY_RENDERING_FIBER
+                    .as_ref()
+                    .unwrap()
+                    .clone()
+                    .borrow_mut()
+                    .memoized_state = Some(MemoizedState::Hook(hook.clone()));
                 WORK_IN_PROGRESS_HOOK = Some(hook.clone());
             }
         } else {
-            WORK_IN_PROGRESS_HOOK.as_ref().unwrap().clone().borrow_mut().next = Some(hook.clone());
+            WORK_IN_PROGRESS_HOOK
+                .as_ref()
+                .unwrap()
+                .clone()
+                .borrow_mut()
+                .next = Some(hook.clone());
             WORK_IN_PROGRESS_HOOK = Some(hook.clone());
         }
         WORK_IN_PROGRESS_HOOK.clone()
@@ -107,72 +107,40 @@ fn mount_work_in_progress_nook() -> Option<Rc<RefCell<Hook>>> {
 
 fn mount_state(initial_state: &JsValue) -> Vec<JsValue> {
     let hook = mount_work_in_progress_nook();
-    // let memoizedState: State;
-    // if (initialState instanceof Function) {
-    //     memoizedState = initialState();
-    // } else {
-    //     memoizedState = initialState;
-    // }
-    // hook.memoizedState = memoizedState;
-    //
-    // if (currentlyRenderingFiber === null) {
-    //     console.error('mountState时currentlyRenderingFiber不存在');
-    // }
-    // const queue = createUpdateQueue<State>();
-    // hook.updateQueue = queue;
+    let memoized_state: JsValue;
+    if initial_state.is_function() {
+        memoized_state = initial_state
+            .dyn_ref::<Function>()
+            .unwrap()
+            .call0(&JsValue::null())
+            .unwrap();
+    } else {
+        memoized_state = initial_state.clone();
+    }
+    hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+        Some(MemoizedState::JsValue(Rc::new((memoized_state))));
 
-    // let closure = Closure::wrap(Box::new(|| unsafe {
-    //     // dispatch_set_state1(CURRENTLY_RENDERING_FIBER.clone());
-    //     log!("closure")
-    // }));
+    unsafe {
+        if CURRENTLY_RENDERING_FIBER.is_none() {
+            log!("mount_state, currentlyRenderingFiber is empty");
+        }
+    }
+    let queue = create_update_queue();
+    hook.as_ref().unwrap().clone().borrow_mut().update_queue = Option::from(queue);
 
     let closure = Closure::wrap(Box::new(move |action: &JsValue| unsafe {
-        // web_sys::console::log_1(&"Hello, world!".into());
-        dispatch_set_state(CURRENTLY_RENDERING_FIBER.clone(), action)
+        dispatch_set_state(CURRENTLY_RENDERING_FIBER.clone(), queue.clone(), action)
     }) as Box<dyn Fn(&JsValue)>);
-
     let function = closure.as_ref().unchecked_ref::<Function>().clone();
-
-    // Don't forget to forget the closure or it will be cleaned up when it goes out of scope.
     closure.forget();
 
-
-    return vec![
-        initial_state.to_owned(),
-        function.into(),
-    ];
+    return vec![initial_state.to_owned(), function.into()];
 }
 
-
-fn dispatch_set_state1(fiber: Option<Rc<RefCell<FiberNode>>>) {
-    log!("dispatch_set_state {:?}", fiber)
-}
-
-fn dispatch_set_state(fiber: Option<Rc<RefCell<FiberNode>>>, action: &JsValue) {
-    log!("dispatch_set_state {:?}", action)
-}
-
-
-// pub fn update_current_dispatcher() {
-//     unsafe {
-//         let use_state = || {
-//             log!("use_state");
-//             vec![JsValue::null(), JsValue::null()]
-//         };
-//         let use_callback = || {
-//             log!("use_callback");
-//         };
-//         let b = Box::new(Dispatcher::new(&use_state, &use_callback));
-//         CURRENT_DISPATCHER.current = Some(b);
-//     }
-// }
-
-#[wasm_bindgen(js_name = useStateImpl)]
-pub unsafe fn use_state(initial_state: &JsValue) -> Vec<JsValue> {
-    let dispatcher = CURRENT_DISPATCHER.current.as_ref();
-    if dispatcher.is_none() {
-        log!("dispatcher doesn't exist")
-    }
-    let use_state = dispatcher.unwrap().use_state;
-    (*use_state)(initial_state)
+fn dispatch_set_state(fiber: Option<Rc<RefCell<FiberNode>>>, update_queue: Rc<RefCell<UpdateQueue>>, action: &JsValue) {
+    let update = create_update(Rc::new(*action.clone()));
+    enqueue_update(update_queue, update);
+    let a = fiber.as_ref().unwrap().borrow();
+    // a.s
+    // scheduleUpdateOnFiber(fiber);
 }

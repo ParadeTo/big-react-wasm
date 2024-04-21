@@ -40,15 +40,8 @@ pub unsafe fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsVal
 }
 
 
-// #[wasm_bindgen]
-// extern "C" {
-//     fn useStateImpl() -> Vec<JsValue>;
-// }
-
-
 #[wasm_bindgen(js_name = useState)]
 pub unsafe fn use_state(initial_state: &JsValue) -> JsValue {
-    // useStateImpl()
     let use_state = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_state;
     use_state.call1(&JsValue::null(), initial_state).unwrap()
 }

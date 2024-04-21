@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
@@ -32,12 +32,16 @@ pub fn create_update(action: Rc<JsValue>) -> Update {
     }
 }
 
-pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {
-    if fiber.update_queue.is_some() {
-        let uq = fiber.update_queue.clone().unwrap();
-        let mut update_queue = uq.borrow_mut();
-        update_queue.shared.pending = Some(update);
-    }
+pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, update: Update) {
+    update_queue.borrow_mut().shared.pending = Option::from(update);
+}
+
+pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
+    Rc::new(RefCell::new(UpdateQueue {
+        shared: UpdateType {
+            pending: None,
+        },
+    }))
 }
 
 pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {

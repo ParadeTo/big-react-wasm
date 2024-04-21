@@ -81,7 +81,6 @@ fn _reconcile_child_fibers(
         }
     }
     todo!("Unsupported child type when reconcile");
-    return None;
 }
 
 pub fn reconcile_child_fibers(

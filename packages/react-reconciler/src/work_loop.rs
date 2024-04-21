@@ -116,7 +116,7 @@ impl WorkLoop {
         let root_has_effect =
             get_mutation_mask().contains(finished_work.clone().borrow().flags.clone());
 
-        let mut commit_work = &mut CommitWork::new(self.complete_work.host_config.clone());
+        let commit_work = &mut CommitWork::new(self.complete_work.host_config.clone());
         if subtree_has_effect || root_has_effect {
             commit_work.commit_mutation_effects(finished_work.clone());
             cloned.borrow_mut().current = finished_work.clone();

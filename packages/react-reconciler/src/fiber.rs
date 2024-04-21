@@ -12,7 +12,7 @@ use shared::derive_from_js_value;
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::Hook;
-use crate::update_queue::{Update, UpdateQueue, UpdateType};
+use crate::update_queue::{Update, UpdateQueue};
 use crate::work_tags::WorkTag;
 
 #[derive(Debug)]
@@ -83,7 +83,7 @@ impl FiberNode {
     }
 
     pub fn enqueue_update(&mut self, update: Update) {
-        let mut update_queue = match &self.update_queue {
+        let update_queue = match &self.update_queue {
             None => {
                 return;
             }
@@ -92,14 +92,6 @@ impl FiberNode {
 
         let mut u = update_queue.borrow_mut();
         u.shared.pending = Some(update);
-    }
-
-    pub fn initialize_update_queue(&mut self) {
-        self.update_queue = Some(Rc::new(RefCell::new(UpdateQueue {
-            shared: UpdateType {
-                pending: Some(Update { action: None }),
-            },
-        })));
     }
 
     pub fn create_work_in_progress(
@@ -176,7 +168,7 @@ impl FiberRootNode {
 
 impl Debug for FiberRootNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut root = self.current.clone().borrow().alternate.clone();
+        let root = self.current.clone().borrow().alternate.clone();
         Ok(if let Some(node) = root {
             let mut queue = VecDeque::new();
             queue.push_back(Rc::clone(&node));
@@ -193,7 +185,8 @@ impl Debug for FiberRootNode {
                             current_borrowed._type.as_ref().unwrap(),
                             current_borrowed.flags,
                             current_borrowed.subtree_flags
-                        );
+                        )
+                            .expect("print error");
                     }
                     WorkTag::HostRoot => {
                         write!(
@@ -201,7 +194,8 @@ impl Debug for FiberRootNode {
                             "{:?}(subtreeFlags:{:?})",
                             WorkTag::HostRoot,
                             current_ref.subtree_flags
-                        );
+                        )
+                            .expect("print error");
                     }
                     WorkTag::HostComponent => {
                         let current_borrowed = current.borrow();
@@ -216,7 +210,8 @@ impl Debug for FiberRootNode {
                                 .unwrap(),
                             current_borrowed.flags,
                             current_borrowed.subtree_flags
-                        );
+                        )
+                            .expect("print error");
                     }
                     WorkTag::HostText => {
                         let current_borrowed = current.borrow();
@@ -233,7 +228,8 @@ impl Debug for FiberRootNode {
                                 .as_string()
                                 .unwrap(),
                             current_borrowed.flags
-                        );
+                        )
+                            .expect("print error");
                     }
                 };
                 if let Some(ref child) = current_ref.child {
@@ -251,17 +247,18 @@ impl Debug for FiberRootNode {
                         (current_ref._return.as_ref(), next_ref._return.as_ref())
                     {
                         if !Rc::ptr_eq(current_parent, next_parent) {
-                            writeln!(f, "");
-                            writeln!(f, "------------------------------------");
+                            writeln!(f, "").expect("print error");
+                            writeln!(f, "------------------------------------")
+                                .expect("print error");
                             continue;
                         }
                     }
 
                     if current_ref._return.is_some() {
-                        write!(f, ",");
+                        write!(f, ",").expect("print error");
                     } else {
-                        writeln!(f, "");
-                        writeln!(f, "------------------------------------");
+                        writeln!(f, "").expect("print error");
+                        writeln!(f, "------------------------------------").expect("print error");
                     }
                 }
             }
