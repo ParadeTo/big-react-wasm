@@ -130,7 +130,7 @@ impl FiberNode {
             wip.pending_props = Some(pending_props.clone());
             wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
             wip.flags = c.flags.clone();
-            wip.child = Some(Rc::clone(c.child.as_ref().unwrap()));
+            wip.child = c.child.clone();
             wip.memoized_props = c.memoized_props.clone();
             wip.memoized_state = c.memoized_state.clone();
             w.clone().unwrap()

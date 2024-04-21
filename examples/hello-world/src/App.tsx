@@ -1,11 +1,12 @@
-import dayjs from 'dayjs'
 import {useState} from 'react'
 
 function App() {
     const [a, setA] = useState("a")
-    console.log(a, setA('ayou'))
+    setTimeout(() => {
+        setA('2')
+    }, 1000)
     return (
-        <div><Comp>{dayjs().format()}</Comp></div>
+        <div><Comp>{a}</Comp></div>
     )
 }
 

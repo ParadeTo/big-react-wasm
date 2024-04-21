@@ -46,9 +46,8 @@ pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
 
 pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
     let rc_fiber = fiber.clone();
-    let mut fiber = rc_fiber.borrow_mut();
-    let mut new_state = None;
-    match fiber.update_queue.clone() {
+    let mut new_state = rc_fiber.borrow().memoized_state.clone();
+    match rc_fiber.borrow().update_queue.clone() {
         None => {
             log!("{:?} process_update_queue, update_queue is empty", fiber)
         }
@@ -74,5 +73,5 @@ pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
         }
     }
 
-    fiber.memoized_state = new_state
+    fiber.clone().borrow_mut().memoized_state = new_state
 }

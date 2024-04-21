@@ -9,6 +9,7 @@ use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::update_queue::{create_update, create_update_queue, enqueue_update, UpdateQueue};
+use crate::work_loop::WorkLoop;
 
 #[wasm_bindgen]
 extern "C" {
@@ -17,6 +18,7 @@ extern "C" {
 
 static mut CURRENTLY_RENDERING_FIBER: Option<Rc<RefCell<FiberNode>>> = None;
 static mut WORK_IN_PROGRESS_HOOK: Option<Rc<RefCell<Hook>>> = None;
+pub static mut WORK_LOOP: Option<Rc<RefCell<WorkLoop>>> = None;
 
 #[derive(Debug, Clone)]
 pub struct Hook {
@@ -126,10 +128,14 @@ fn mount_state(initial_state: &JsValue) -> Vec<JsValue> {
         }
     }
     let queue = create_update_queue();
-    hook.as_ref().unwrap().clone().borrow_mut().update_queue = Option::from(queue);
+    hook.as_ref().unwrap().clone().borrow_mut().update_queue = Option::from(queue.clone());
 
     let closure = Closure::wrap(Box::new(move |action: &JsValue| unsafe {
-        dispatch_set_state(CURRENTLY_RENDERING_FIBER.clone(), queue.clone(), action)
+        dispatch_set_state(
+            CURRENTLY_RENDERING_FIBER.clone().unwrap(),
+            queue.clone(),
+            action,
+        )
     }) as Box<dyn Fn(&JsValue)>);
     let function = closure.as_ref().unchecked_ref::<Function>().clone();
     closure.forget();
@@ -137,10 +143,19 @@ fn mount_state(initial_state: &JsValue) -> Vec<JsValue> {
     return vec![initial_state.to_owned(), function.into()];
 }
 
-fn dispatch_set_state(fiber: Option<Rc<RefCell<FiberNode>>>, update_queue: Rc<RefCell<UpdateQueue>>, action: &JsValue) {
-    let update = create_update(Rc::new(*action.clone()));
+fn dispatch_set_state(
+    fiber: Rc<RefCell<FiberNode>>,
+    update_queue: Rc<RefCell<UpdateQueue>>,
+    action: &JsValue,
+) {
+    let update = create_update(Rc::new(action.clone()));
     enqueue_update(update_queue, update);
-    let a = fiber.as_ref().unwrap().borrow();
-    // a.s
-    // scheduleUpdateOnFiber(fiber);
+    unsafe {
+        WORK_LOOP
+            .as_ref()
+            .unwrap()
+            .clone()
+            .borrow()
+            .schedule_update_on_fiber(fiber.clone());
+    }
 }
