@@ -40,7 +40,7 @@ impl Hook {
 fn update_mount_hooks_to_dispatcher() {
     let object = Object::new();
 
-    let closure = Closure::wrap(Box::new(mount_state) as Box<dyn Fn(&JsValue) -> Vec<JsValue>>);
+    let closure = Closure::wrap(Box::new(mount_state) as Box<dyn Fn(&JsValue) -> Result<Vec<JsValue>, JsValue>>);
     let function = closure.as_ref().unchecked_ref::<Function>().clone();
     closure.forget();
     Reflect::set(&object, &"use_state".into(), &function).expect("TODO: panic set use_state");
@@ -107,20 +107,20 @@ fn mount_work_in_progress_nook() -> Option<Rc<RefCell<Hook>>> {
     }
 }
 
-fn mount_state(initial_state: &JsValue) -> Vec<JsValue> {
+fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     let hook = mount_work_in_progress_nook();
     let memoized_state: JsValue;
+
     if initial_state.is_function() {
         memoized_state = initial_state
             .dyn_ref::<Function>()
             .unwrap()
-            .call0(&JsValue::null())
-            .unwrap();
+            .call0(&JsValue::null())?;
     } else {
         memoized_state = initial_state.clone();
     }
     hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
-        Some(MemoizedState::JsValue(Rc::new((memoized_state))));
+        Some(MemoizedState::JsValue(Rc::new((memoized_state.clone()))));
 
     unsafe {
         if CURRENTLY_RENDERING_FIBER.is_none() {
@@ -140,7 +140,7 @@ fn mount_state(initial_state: &JsValue) -> Vec<JsValue> {
     let function = closure.as_ref().unchecked_ref::<Function>().clone();
     closure.forget();
 
-    return vec![initial_state.to_owned(), function.into()];
+    Ok(vec![memoized_state, function.into()])
 }
 
 fn dispatch_set_state(

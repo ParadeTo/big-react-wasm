@@ -1,7 +1,9 @@
 import {useState} from 'react'
 
 function App() {
-    const [a, setA] = useState("a")
+    const [a, setA] = useState(() => {
+        return "a"
+    })
     setTimeout(() => {
         setA('2')
     }, 1000)

@@ -16,14 +16,15 @@ use crate::work_tags::WorkTag;
 static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
 
 pub struct WorkLoop {
-    work_in_progress: Option<Rc<RefCell<FiberNode>>>,
+    // make the first param to be &self not &mut self
+    // work_in_progress: Option<Rc<RefCell<FiberNode>>>,
     complete_work: CompleteWork,
 }
 
 impl WorkLoop {
     pub fn new(host_config: Rc<dyn HostConfig>) -> Self {
         Self {
-            work_in_progress: None,
+            // work_in_progress: None,
             complete_work: CompleteWork::new(host_config),
         }
     }
