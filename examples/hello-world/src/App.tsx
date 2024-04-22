@@ -1,14 +1,12 @@
 import {useState} from 'react'
 
 function App() {
-    const [a, setA] = useState(() => {
-        return "a"
-    })
+    const [name, setName] = useState(() => 'ayou')
     setTimeout(() => {
-        setA('2')
+        setName('ayouayou')
     }, 1000)
     return (
-        <div><Comp>{a}</Comp></div>
+        <div><Comp>{name}</Comp></div>
     )
 }
 
