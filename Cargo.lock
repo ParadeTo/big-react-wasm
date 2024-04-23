@@ -68,6 +68,8 @@ name = "react"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "js-sys",
+ "log",
  "shared",
  "wasm-bindgen",
  "wasm-bindgen-test",
