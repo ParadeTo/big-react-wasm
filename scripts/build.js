@@ -18,8 +18,8 @@ packageJson.files.push('jsx-dev-runtime.wasm', 'jsx-dev-runtime.js', 'jsx-dev-ru
 fs.writeFileSync(packageJsonFilename, JSON.stringify(packageJson))
 
 // modify react-dom/index_bg.js
-const reactDomIndexBgFilename = isTest ? `${cwd}/dist/react-dom/index.js` : `${cwd}/dist/react-dom/index_bg.js`
-const reactDomIndexBgData = fs.readFileSync(reactDomIndexBgFilename)
-fs.writeFileSync(reactDomIndexBgFilename, isTest ? 'const {updateDispatcher}=require("react")' : 'import {updateDispatcher} from "react"\n' + reactDomIndexBgData)
+const reactDomIndexFilename = isTest ? `${cwd}/dist/react-dom/index.js` : `${cwd}/dist/react-dom/index_bg.js`
+const reactDomIndexBgData = fs.readFileSync(reactDomIndexFilename)
+fs.writeFileSync(reactDomIndexFilename, (isTest ? 'const {updateDispatcher} = require("react");\n' : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData)
 
 
