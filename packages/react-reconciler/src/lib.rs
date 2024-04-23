@@ -3,12 +3,19 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
-use web_sys::{Element, window};
-use web_sys::js_sys::Reflect;
 
-use crate::fiber::FiberRootNode;
+use crate::fiber::{FiberNode, FiberRootNode, StateNode};
+use crate::update_queue::{create_update, enqueue_update};
+use crate::work_loop::WorkLoop;
+use crate::work_tags::WorkTag;
 
 pub mod fiber;
+mod fiber_flags;
+mod work_tags;
+mod update_queue;
+mod work_loop;
+mod begin_work;
+mod child_fiber;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;
@@ -18,28 +25,28 @@ pub trait HostConfig {
 }
 
 pub struct Reconciler {
-    host_config: Box<dyn HostConfig>,
+    host_config: Rc<dyn HostConfig>,
 }
 
 impl Reconciler {
-    pub fn new(host_config: Box<dyn HostConfig>) -> Self {
+    pub fn new(host_config: Rc<dyn HostConfig>) -> Self {
         Reconciler { host_config }
     }
     pub fn create_container(&self, container: &JsValue) -> Rc<RefCell<FiberRootNode>> {
-        Rc::new(RefCell::new(FiberRootNode {}))
+        let host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot, None, None)));
+        host_root_fiber.clone().borrow_mut().initialize_update_queue();
+        let root = Rc::new(RefCell::new(FiberRootNode::new(Rc::new(container.clone()), host_root_fiber.clone())));
+        let r1 = root.clone();
+        host_root_fiber.borrow_mut().state_node = Some(Rc::new(StateNode::FiberRootNode(r1)));
+        root.clone()
     }
 
     pub fn update_container(&self, element: Rc<JsValue>, root: Rc<RefCell<FiberRootNode>>) {
-        let props = Reflect::get(&*element, &JsValue::from_str("props")).unwrap();
-        let _type = Reflect::get(&*element, &JsValue::from_str("type")).unwrap();
-        let children = Reflect::get(&props, &JsValue::from_str("children")).unwrap();
-        let text_instance = self.host_config.create_text_instance(children.as_string().unwrap());
-        let div_instance = self.host_config.create_instance(_type.as_string().unwrap());
-        self.host_config.append_initial_child(div_instance.clone(), text_instance);
-        let window = window().unwrap();
-        let document = window.document().unwrap();
-        let body = document.body().expect("document should have a body");
-        body.append_child(&*div_instance.clone().downcast::<Element>().unwrap());
+        let host_root_fiber = Rc::clone(&root).borrow().current.clone();
+        let update = create_update(element);
+        enqueue_update(host_root_fiber.borrow(), update);
+        let mut work_loop = WorkLoop::new(self.host_config.clone());
+        work_loop.schedule_update_on_fiber(host_root_fiber);
     }
 }
 
