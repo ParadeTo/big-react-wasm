@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::rc::Rc;
 
-use web_sys::{window, Node};
+use web_sys::{Node, window};
 
 use react_reconciler::HostConfig;
 use shared::log;
@@ -37,5 +37,21 @@ impl HostConfig for ReactDomHostConfig {
 
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>) {
         self.append_initial_child(parent, child)
+    }
+
+    fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>) {
+        let p = container.clone().downcast::<Node>().unwrap();
+        let c = child.clone().downcast::<Node>().unwrap();
+        match p.remove_child(&c) {
+            Ok(_) => {
+                log!("remove_child successfully {:?} {:?}", p, c);
+            }
+            Err(_) => todo!(),
+        }
+    }
+
+    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String) {
+        let text_instance = text_instance.clone().downcast::<Node>().unwrap();
+        text_instance.set_node_value(Some(content.as_str()));
     }
 }

@@ -26,14 +26,28 @@ pub fn begin_work(
 fn update_function_component(
     work_in_progress: Rc<RefCell<FiberNode>>,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
-    let next_children = Rc::new(render_with_hooks(work_in_progress.clone())?);
+    let next_children = render_with_hooks(work_in_progress.clone())?;
     reconcile_children(work_in_progress.clone(), Some(next_children));
     Ok(work_in_progress.clone().borrow().child.clone())
 }
 
 fn update_host_root(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
-    process_update_queue(work_in_progress.clone());
-    let next_children = work_in_progress.clone().borrow().memoized_state.clone();
+    let work_in_progress_cloned = work_in_progress.clone();
+
+    let mut base_state;
+    let mut update_queue;
+    {
+        let work_in_progress_borrowed = work_in_progress_cloned.borrow();
+        base_state = work_in_progress_borrowed.memoized_state.clone();
+        update_queue = work_in_progress_borrowed.update_queue.clone();
+    }
+
+    {
+        work_in_progress.clone().borrow_mut().memoized_state =
+            process_update_queue(base_state, update_queue, work_in_progress.clone());
+    }
+
+    let next_children = work_in_progress_cloned.borrow().memoized_state.clone();
     if next_children.is_none() {
         panic!("update_host_root next_children is none")
     }
@@ -50,16 +64,16 @@ fn update_host_component(
 
     let next_children = {
         let ref_fiber_node = work_in_progress.borrow();
-        derive_from_js_value(ref_fiber_node.pending_props.clone().unwrap(), "children")
+        derive_from_js_value(&ref_fiber_node.pending_props, "children")
     };
 
     {
-        reconcile_children(work_in_progress.clone(), next_children);
+        reconcile_children(work_in_progress.clone(), Some(next_children));
     }
     work_in_progress.clone().borrow().child.clone()
 }
 
-fn reconcile_children(work_in_progress: Rc<RefCell<FiberNode>>, children: Option<Rc<JsValue>>) {
+fn reconcile_children(work_in_progress: Rc<RefCell<FiberNode>>, children: Option<JsValue>) {
     let work_in_progress = Rc::clone(&work_in_progress);
     let current = { work_in_progress.borrow().alternate.clone() };
     if current.is_some() {

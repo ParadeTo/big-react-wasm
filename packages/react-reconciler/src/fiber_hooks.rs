@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::prelude::{Closure, wasm_bindgen};
 use web_sys::js_sys::{Function, Object, Reflect};
 
 use shared::log;
@@ -72,8 +72,8 @@ pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsV
     let props;
     {
         let work_in_progress_borrow = work_in_progress_cloned.borrow();
-        _type = work_in_progress_borrow._type.clone().unwrap();
-        props = work_in_progress_borrow.pending_props.clone().unwrap();
+        _type = work_in_progress_borrow._type.clone();
+        props = work_in_progress_borrow.pending_props.clone();
     }
 
     let component = JsValue::dyn_ref::<Function>(&_type).unwrap();
@@ -122,7 +122,7 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
         memoized_state = initial_state.clone();
     }
     hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
-        Some(MemoizedState::JsValue(Rc::new((memoized_state.clone()))));
+        Some(MemoizedState::JsValue(memoized_state.clone()));
 
     unsafe {
         if CURRENTLY_RENDERING_FIBER.is_none() {
@@ -150,7 +150,7 @@ fn dispatch_set_state(
     update_queue: Rc<RefCell<UpdateQueue>>,
     action: &JsValue,
 ) {
-    let update = create_update(Rc::new(action.clone()));
+    let update = create_update(action.clone());
     enqueue_update(update_queue, update);
     unsafe {
         WORK_LOOP

@@ -5,9 +5,9 @@ use std::rc::Rc;
 use shared::log;
 
 use crate::fiber::{FiberNode, StateNode};
-use crate::fiber_flags::{get_mutation_mask, Flags};
-use crate::work_tags::WorkTag;
+use crate::fiber_flags::{Flags, get_mutation_mask};
 use crate::HostConfig;
+use crate::work_tags::WorkTag;
 
 pub struct CommitWork {
     next_effect: Option<Rc<RefCell<FiberNode>>>,
@@ -70,6 +70,29 @@ impl CommitWork {
         if flags.contains(Flags::Placement) {
             self.commit_placement(finished_work.clone());
             finished_work.clone().borrow_mut().flags -= Flags::Placement
+        }
+
+        if flags.contains(Flags::ChildDeletion) {
+            let deletions = finished_work.clone().borrow().deletions.clone();
+            if deletions.is_some() {
+                let deletions = deletions.unwrap();
+                for child_to_delete in deletions {}
+            }
+        }
+    }
+
+    fn commit_deletion(&self, child_to_delete: Rc<RefCell<FiberNode>>) {
+        self.commit_nested_unmounts(child_to_delete, CommitWork::on_commit_unmount);
+    }
+
+    fn on_commit_unmount(unmount_fiber: Rc<RefCell<FiberNode>>) {}
+    fn commit_nested_unmounts<F>(&self, root: Rc<RefCell<FiberNode>>, on_commit_unmount: F)
+        where
+            F: Fn(Rc<RefCell<FiberNode>>)
+    {
+        let mut node = root;
+        loop {
+            on_commit_unmount(node.clone())
         }
     }
 
