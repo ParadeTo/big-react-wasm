@@ -5,9 +5,9 @@ use std::rc::Rc;
 use shared::log;
 
 use crate::fiber::{FiberNode, StateNode};
-use crate::fiber_flags::{Flags, get_mutation_mask};
-use crate::HostConfig;
+use crate::fiber_flags::{get_mutation_mask, Flags};
 use crate::work_tags::WorkTag;
+use crate::HostConfig;
 
 pub struct CommitWork {
     next_effect: Option<Rc<RefCell<FiberNode>>>,

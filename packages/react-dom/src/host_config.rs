@@ -1,13 +1,12 @@
 use std::any::Any;
 use std::rc::Rc;
 
-use web_sys::{Node, window};
+use web_sys::{window, Node};
 
 use react_reconciler::HostConfig;
 use shared::log;
 
 pub struct ReactDomHostConfig;
-
 
 impl HostConfig for ReactDomHostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any> {
@@ -20,9 +19,7 @@ impl HostConfig for ReactDomHostConfig {
         let window = window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
         match document.create_element(_type.as_ref()) {
-            Ok(element) => {
-                Rc::new(Node::from(element))
-            }
+            Ok(element) => Rc::new(Node::from(element)),
             Err(_) => todo!(),
         }
     }

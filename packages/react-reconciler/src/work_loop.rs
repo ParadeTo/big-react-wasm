@@ -10,8 +10,8 @@ use crate::commit_work::CommitWork;
 use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::fiber_flags::get_mutation_mask;
-use crate::HostConfig;
 use crate::work_tags::WorkTag;
+use crate::HostConfig;
 
 static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
 

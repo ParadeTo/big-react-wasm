@@ -7,8 +7,8 @@ use web_sys::js_sys::Reflect;
 
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::Flags;
-use crate::HostConfig;
 use crate::work_tags::WorkTag;
+use crate::HostConfig;
 
 pub struct CompleteWork {
     pub host_config: Rc<dyn HostConfig>,
@@ -63,9 +63,9 @@ impl CompleteWork {
                 let node_cloned = node.clone().unwrap().clone();
                 if node_cloned.borrow()._return.is_none()
                     || Rc::ptr_eq(
-                    &node_cloned.borrow()._return.as_ref().unwrap(),
-                    &work_in_progress,
-                )
+                        &node_cloned.borrow()._return.as_ref().unwrap(),
+                        &work_in_progress,
+                    )
                 {
                     return;
                 }

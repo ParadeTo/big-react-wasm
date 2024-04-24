@@ -38,9 +38,7 @@ pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, update: Update) {
 
 pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
     Rc::new(RefCell::new(UpdateQueue {
-        shared: UpdateType {
-            pending: None,
-        },
+        shared: UpdateType { pending: None },
     }))
 }
 

@@ -21,4 +21,3 @@ pub fn derive_from_js_value(js_value: Rc<JsValue>, str: &str) -> Option<Rc<JsVal
         }
     }
 }
-

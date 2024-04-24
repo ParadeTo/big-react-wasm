@@ -186,7 +186,7 @@ impl Debug for FiberRootNode {
                             current_borrowed.flags,
                             current_borrowed.subtree_flags
                         )
-                            .expect("print error");
+                        .expect("print error");
                     }
                     WorkTag::HostRoot => {
                         write!(
@@ -195,7 +195,7 @@ impl Debug for FiberRootNode {
                             WorkTag::HostRoot,
                             current_ref.subtree_flags
                         )
-                            .expect("print error");
+                        .expect("print error");
                     }
                     WorkTag::HostComponent => {
                         let current_borrowed = current.borrow();
@@ -211,7 +211,7 @@ impl Debug for FiberRootNode {
                             current_borrowed.flags,
                             current_borrowed.subtree_flags
                         )
-                            .expect("print error");
+                        .expect("print error");
                     }
                     WorkTag::HostText => {
                         let current_borrowed = current.borrow();
@@ -224,12 +224,12 @@ impl Debug for FiberRootNode {
                                 current_borrowed.pending_props.as_ref().unwrap(),
                                 &JsValue::from_str("content"),
                             )
-                                .unwrap()
-                                .as_string()
-                                .unwrap(),
+                            .unwrap()
+                            .as_string()
+                            .unwrap(),
                             current_borrowed.flags
                         )
-                            .expect("print error");
+                        .expect("print error");
                     }
                 };
                 if let Some(ref child) = current_ref.child {

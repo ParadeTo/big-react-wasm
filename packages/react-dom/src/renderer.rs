@@ -21,7 +21,7 @@ impl Renderer {
 
 #[wasm_bindgen]
 impl Renderer {
-    pub fn render(&self, element: &JsValue) {
+    pub fn render(&self, element: &JsValue) -> JsValue {
         self.reconciler
             .update_container(Rc::new(element.clone()), self.root.clone())
     }
