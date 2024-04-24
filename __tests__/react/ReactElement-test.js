@@ -77,7 +77,6 @@ describe('ReactElement', () => {
   it('does not fail if config has no prototype', () => {
     const config = Object.create(null, {foo: {value: 1, enumerable: true}})
     const element = React.createElement(ComponentFC, config)
-    console.log(element)
     expect(element.props.foo).toBe(1)
   })
 
@@ -236,7 +235,6 @@ describe('ReactElement', () => {
     }
 
     const test = ReactTestUtils.renderIntoDocument(<Test value={+undefined} />)
-    console.log('test:', test)
     expect(test.props.value).toBeNaN()
   })
 
