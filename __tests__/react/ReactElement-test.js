@@ -40,7 +40,7 @@ describe('ReactElement', () => {
     global.Symbol = originalSymbol
   })
 
-  it.only('uses the fallback value when in an environment without Symbol', () => {
+  it('uses the fallback value when in an environment without Symbol', () => {
     expect((<div />).$$typeof).toBe('react.element')
   })
 
