@@ -51,7 +51,7 @@ pub struct FiberNode {
     pub _type: JsValue,
     pub flags: Flags,
     pub subtree_flags: Flags,
-    pub memoized_props: Option<Rc<JsValue>>,
+    pub memoized_props: JsValue,
     pub memoized_state: Option<MemoizedState>,
     pub deletions: Option<Vec<Rc<RefCell<FiberNode>>>>,
 }
@@ -70,7 +70,7 @@ impl FiberNode {
             child: None,
             alternate: None,
             _type: JsValue::null(),
-            memoized_props: None,
+            memoized_props: JsValue::null(),
             memoized_state: None,
             flags: Flags::NoFlags,
             subtree_flags: Flags::NoFlags,
@@ -119,7 +119,7 @@ impl FiberNode {
         return if w.is_none() {
             let mut wip = {
                 let c = c_rc.borrow();
-                let mut wip = FiberNode::new(c.tag.clone(), c.pending_props.clone(), c.key.clone());
+                let mut wip = FiberNode::new(c.tag.clone(), pending_props, c.key.clone());
                 wip.update_queue = match c.update_queue.as_ref() {
                     None => None,
                     Some(update_queue) => {
