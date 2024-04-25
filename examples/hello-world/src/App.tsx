@@ -12,11 +12,11 @@ function App() {
         }, 1000)
     }
 
-    return name
+    return <Comp>{name}</Comp>
 }
 
-// function Comp({children}) {
-//     return <span><i>{`Hello world, ${children}`}</i></span>
-// }
+function Comp({children}) {
+    return <span><i>{`Hello world, ${children}`}</i></span>
+}
 
 export default App

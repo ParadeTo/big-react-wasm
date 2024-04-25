@@ -5,7 +5,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::{Object, Reflect};
 
-use shared::derive_from_js_value;
+use shared::{derive_from_js_value, log};
 
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::Flags;
@@ -135,7 +135,7 @@ impl CompleteWork {
             }
             WorkTag::HostComponent => {
                 if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
-                    todo!("update properties")
+                    log!("update properties")
                 } else {
                     let instance = self.host_config.create_instance(
                         work_in_progress
