@@ -73,10 +73,6 @@ fn reconcile_single_element(
             if derive_from_js_value(&(*element).clone(), "$$typeof") != REACT_ELEMENT_TYPE {
                 panic!("Undefined $$typeof");
             }
-            log!("reconcile_single_element {:?} {:?} {:?}",Object::is(
-                &current_first_child_cloned.borrow()._type,
-                &derive_from_js_value(&(*element).clone(), "type"),
-            ), &current_first_child.clone().unwrap().clone().borrow()._type, &derive_from_js_value(&(*element).clone(), "type"));
 
             if Object::is(
                 &current_first_child_cloned.borrow()._type,

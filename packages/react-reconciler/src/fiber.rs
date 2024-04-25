@@ -8,7 +8,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::{derive_from_js_value, log};
+use shared::derive_from_js_value;
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::Hook;
@@ -91,7 +91,6 @@ impl FiberNode {
 
         let mut fiber = FiberNode::new(fiber_tag, props, key);
         fiber._type = _type;
-        log!("create_fiber_from_element {:?} {:?}", fiber.tag, fiber._type);
         fiber
     }
 
@@ -121,7 +120,12 @@ impl FiberNode {
             let mut wip = {
                 let c = c_rc.borrow();
                 let mut wip = FiberNode::new(c.tag.clone(), c.pending_props.clone(), c.key.clone());
-                wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
+                wip.update_queue = match c.update_queue.as_ref() {
+                    None => None,
+                    Some(update_queue) => {
+                        Some(update_queue.clone())
+                    }
+                };
                 wip.flags = c.flags.clone();
                 wip.child = c.child.clone();
                 wip.memoized_props = c.memoized_props.clone();
@@ -136,8 +140,6 @@ impl FiberNode {
                 let mut fibler_node = c_rc.borrow_mut();
                 fibler_node.alternate = Some(wip_rc.clone());
             }
-
-            log!("mount wip_rc alternate {:?} {:?}", wip_rc.clone().borrow().tag, wip_rc.clone().borrow()._type);
             wip_rc
         } else {
             let w = w.clone().unwrap();
@@ -152,7 +154,6 @@ impl FiberNode {
                 wip.memoized_props = c.memoized_props.clone();
                 wip.memoized_state = c.memoized_state.clone();
             }
-            log!("update wip_rc alternate {:?} {:?}", w.clone().borrow().tag,w.clone().borrow()._type);
             w.clone()
         };
     }

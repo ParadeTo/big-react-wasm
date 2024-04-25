@@ -69,10 +69,8 @@ pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsV
 
     let current = work_in_progress_cloned.borrow().alternate.clone();
     if current.is_some() {
-        log!("render with hooks, update");
         update_hooks_to_dispatcher(true);
     } else {
-        log!("render with hooks, mount");
         update_hooks_to_dispatcher(false);
     }
 
@@ -235,7 +233,7 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     let queue = create_update_queue();
     let q_rc = Rc::new(queue.clone());
     let q_rc_cloned = q_rc.clone();
-    hook.as_ref().unwrap().clone().borrow_mut().update_queue = Option::from(queue.clone());
+    hook.as_ref().unwrap().clone().borrow_mut().update_queue = Some(queue.clone());
     let fiber = unsafe {
         CURRENTLY_RENDERING_FIBER.clone().unwrap()
     };
@@ -256,6 +254,7 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
 
 fn update_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     let hook = update_work_in_progress_hook();
+
     if hook.is_none() {
         panic!("update_state hook is none")
     }
@@ -271,8 +270,8 @@ fn update_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
             queue.clone(),
             CURRENTLY_RENDERING_FIBER.clone().unwrap(),
         );
-        log!("update_state {:?}", CURRENTLY_RENDERING_FIBER);
     }
+    log!("memoized_state {:?}", hook_cloned.borrow().memoized_state);
 
     Ok(vec![
         hook.clone().unwrap().clone()
@@ -292,7 +291,8 @@ fn dispatch_set_state(
     action: &JsValue,
 ) {
     let update = create_update(action.clone());
-    enqueue_update(update_queue, update);
+    enqueue_update(update_queue.clone(), update);
+    log!("{:?} {:?}", update_queue.clone(), fiber.clone().borrow().update_queue.clone());
     unsafe {
         WORK_LOOP
             .as_ref()

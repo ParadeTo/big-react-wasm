@@ -91,7 +91,7 @@ impl WorkLoop {
         }
 
         log!("{:?}", *root.clone().borrow());
-
+        
         let finished_work = {
             root.clone()
                 .borrow()
