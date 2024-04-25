@@ -65,16 +65,18 @@ fn reconcile_single_element(
 
     let element = element.as_ref().unwrap();
     let key = derive_from_js_value(&(*element).clone(), "key");
-
     if current_first_child.is_some() {
         let current_first_child_cloned = current_first_child.clone().unwrap().clone();
-        ;
         // Be careful, it is different with ===
         // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Equality_comparisons_and_sameness#same-value_equality_using_object.is
         if Object::is(&current_first_child_cloned.borrow().key, &key) {
             if derive_from_js_value(&(*element).clone(), "$$typeof") != REACT_ELEMENT_TYPE {
                 panic!("Undefined $$typeof");
             }
+            log!("reconcile_single_element {:?} {:?} {:?}",Object::is(
+                &current_first_child_cloned.borrow()._type,
+                &derive_from_js_value(&(*element).clone(), "type"),
+            ), &current_first_child.clone().unwrap().clone().borrow()._type, &derive_from_js_value(&(*element).clone(), "type"));
 
             if Object::is(
                 &current_first_child_cloned.borrow()._type,

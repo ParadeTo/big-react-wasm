@@ -1,17 +1,17 @@
 import {useState} from 'react'
 
+
 function App() {
     const [name, setName] = useState(() => 'ayou')
-    setTimeout(() => {
+    let tid = setTimeout(() => {
         setName('ayouayou')
+        clearTimeout((tid))
     }, 1000)
-    return (
-        <div><Comp>{name}</Comp></div>
-    )
+    return name
 }
 
-function Comp({children}) {
-    return <span><i>{`Hello world, ${children}`}</i></span>
-}
+// function Comp({children}) {
+//     return <span><i>{`Hello world, ${children}`}</i></span>
+// }
 
 export default App

@@ -2,8 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
+use web_sys::js_sys::Reflect;
 
-use shared::derive_from_js_value;
+use shared::{derive_from_js_value, log};
 
 use crate::child_fiber::{mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
@@ -34,8 +35,8 @@ fn update_function_component(
 fn update_host_root(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
     let work_in_progress_cloned = work_in_progress.clone();
 
-    let mut base_state;
-    let mut update_queue;
+    let base_state;
+    let update_queue;
     {
         let work_in_progress_borrowed = work_in_progress_cloned.borrow();
         base_state = work_in_progress_borrowed.memoized_state.clone();
@@ -51,7 +52,9 @@ fn update_host_root(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCe
     if next_children.is_none() {
         panic!("update_host_root next_children is none")
     }
+
     if let MemoizedState::JsValue(next_children) = next_children.unwrap() {
+        log!("next_children {:?}", Reflect::get(&next_children, &"type".into()));
         reconcile_children(work_in_progress.clone(), Some(next_children));
     }
     work_in_progress.clone().borrow().child.clone()

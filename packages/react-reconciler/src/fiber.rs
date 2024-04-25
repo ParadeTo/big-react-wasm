@@ -8,7 +8,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::derive_from_js_value;
+use shared::{derive_from_js_value, log};
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::Hook;
@@ -25,6 +25,15 @@ pub enum StateNode {
 pub enum MemoizedState {
     JsValue(JsValue),
     Hook(Rc<RefCell<Hook>>),
+}
+
+impl MemoizedState {
+    pub fn js_value(&self) -> Option<JsValue> {
+        match self {
+            MemoizedState::JsValue(js_value) => Some(js_value.clone()),
+            MemoizedState::Hook(_) => None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -78,8 +87,11 @@ impl FiberNode {
         if _type.is_string() {
             fiber_tag = WorkTag::HostComponent
         }
+
+
         let mut fiber = FiberNode::new(fiber_tag, props, key);
         fiber._type = _type;
+        log!("create_fiber_from_element {:?} {:?}", fiber.tag, fiber._type);
         fiber
     }
 
@@ -120,21 +132,28 @@ impl FiberNode {
             wip.state_node = c_rc.borrow().state_node.clone();
             wip.alternate = Some(current);
             let wip_rc = Rc::new(RefCell::new(wip));
-            let mut fibler_node = c_rc.borrow_mut();
-            fibler_node.alternate = Some(wip_rc.clone());
+            {
+                let mut fibler_node = c_rc.borrow_mut();
+                fibler_node.alternate = Some(wip_rc.clone());
+            }
+
+            log!("mount wip_rc alternate {:?} {:?}", wip_rc.clone().borrow().tag, wip_rc.clone().borrow()._type);
             wip_rc
         } else {
-            let c = c_rc.borrow();
-            let a = w.clone().unwrap();
-            let mut wip = a.borrow_mut();
-
-            wip.pending_props = pending_props;
-            wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
-            wip.flags = c.flags.clone();
-            wip.child = c.child.clone();
-            wip.memoized_props = c.memoized_props.clone();
-            wip.memoized_state = c.memoized_state.clone();
-            w.clone().unwrap()
+            let w = w.clone().unwrap();
+            {
+                let wip_cloned = w.clone();
+                let mut wip = wip_cloned.borrow_mut();
+                let c = c_rc.borrow();
+                wip.pending_props = pending_props;
+                wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
+                wip.flags = c.flags.clone();
+                wip.child = c.child.clone();
+                wip.memoized_props = c.memoized_props.clone();
+                wip.memoized_state = c.memoized_state.clone();
+            }
+            log!("update wip_rc alternate {:?} {:?}", w.clone().borrow().tag,w.clone().borrow()._type);
+            w.clone()
         };
     }
 

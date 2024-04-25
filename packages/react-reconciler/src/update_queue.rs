@@ -24,6 +24,7 @@ pub struct UpdateType {
 #[derive(Clone, Debug)]
 pub struct UpdateQueue {
     pub shared: UpdateType,
+    pub dispatch: Option<Function>,
 }
 
 pub fn create_update(action: JsValue) -> Update {
@@ -39,15 +40,15 @@ pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, update: Update) {
 pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
     Rc::new(RefCell::new(UpdateQueue {
         shared: UpdateType { pending: None },
+        dispatch: None,
     }))
 }
 
 pub fn process_update_queue(
-    base_state: Option<MemoizedState>,
+    mut base_state: Option<MemoizedState>,
     update_queue: Option<Rc<RefCell<UpdateQueue>>>,
     fiber: Rc<RefCell<FiberNode>>,
 ) -> Option<MemoizedState> {
-    let mut new_state = None;
     if update_queue.is_some() {
         let update_queue = update_queue.clone().unwrap().clone();
         let pending = update_queue.borrow().shared.pending.clone();
@@ -58,7 +59,7 @@ pub fn process_update_queue(
                 None => {}
                 Some(action) => {
                     let f = action.dyn_ref::<Function>();
-                    new_state = match f {
+                    base_state = match f {
                         None => Some(MemoizedState::JsValue(action.clone())),
                         Some(f) => {
                             if let MemoizedState::JsValue(base_state) = base_state.as_ref().unwrap() {
@@ -78,5 +79,5 @@ pub fn process_update_queue(
         log!("{:?} process_update_queue, update_queue is empty", fiber)
     }
 
-    new_state
+    base_state
 }
