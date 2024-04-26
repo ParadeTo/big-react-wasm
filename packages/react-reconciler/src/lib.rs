@@ -5,20 +5,21 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
-use crate::update_queue::{create_update, enqueue_update};
+use crate::fiber_hooks::WORK_LOOP;
+use crate::update_queue::{create_update, create_update_queue, enqueue_update};
 use crate::work_loop::WorkLoop;
 use crate::work_tags::WorkTag;
 
-pub mod fiber;
-mod fiber_flags;
-mod work_tags;
-mod update_queue;
-mod work_loop;
 mod begin_work;
 mod child_fiber;
-mod complete_work;
 mod commit_work;
+mod complete_work;
+pub mod fiber;
+pub mod fiber_flags;
 mod fiber_hooks;
+mod update_queue;
+mod work_loop;
+mod work_tags;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;
@@ -37,8 +38,11 @@ impl Reconciler {
     }
     pub fn create_container(&self, container: Rc<dyn Any>) -> Rc<RefCell<FiberRootNode>> {
         let host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot, None, None)));
-        host_root_fiber.clone().borrow_mut().initialize_update_queue();
-        let root = Rc::new(RefCell::new(FiberRootNode::new(container.clone(), host_root_fiber.clone())));
+        host_root_fiber.clone().borrow_mut().update_queue = Some(create_update_queue());
+        let root = Rc::new(RefCell::new(FiberRootNode::new(
+            container.clone(),
+            host_root_fiber.clone(),
+        )));
         let r1 = root.clone();
         host_root_fiber.borrow_mut().state_node = Some(Rc::new(StateNode::FiberRootNode(r1)));
         root.clone()
@@ -47,10 +51,17 @@ impl Reconciler {
     pub fn update_container(&self, element: Rc<JsValue>, root: Rc<RefCell<FiberRootNode>>) {
         let host_root_fiber = Rc::clone(&root).borrow().current.clone();
         let update = create_update(element);
-        enqueue_update(host_root_fiber.borrow(), update);
-        let mut work_loop = WorkLoop::new(self.host_config.clone());
-        work_loop.schedule_update_on_fiber(host_root_fiber);
+        enqueue_update(
+            host_root_fiber.borrow().update_queue.clone().unwrap(),
+            update,
+        );
+        let work_loop = Rc::new(RefCell::new(WorkLoop::new(self.host_config.clone())));
+        unsafe {
+            WORK_LOOP = Some(work_loop.clone());
+        }
+        work_loop
+            .clone()
+            .borrow()
+            .schedule_update_on_fiber(host_root_fiber);
     }
 }
-
-

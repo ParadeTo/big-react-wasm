@@ -13,20 +13,23 @@ use crate::fiber_flags::get_mutation_mask;
 use crate::HostConfig;
 use crate::work_tags::WorkTag;
 
+static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
+
 pub struct WorkLoop {
-    work_in_progress: Option<Rc<RefCell<FiberNode>>>,
+    // make the first param to be &self not &mut self
+    // work_in_progress: Option<Rc<RefCell<FiberNode>>>,
     complete_work: CompleteWork,
 }
 
 impl WorkLoop {
     pub fn new(host_config: Rc<dyn HostConfig>) -> Self {
         Self {
-            work_in_progress: None,
+            // work_in_progress: None,
             complete_work: CompleteWork::new(host_config),
         }
     }
 
-    pub fn schedule_update_on_fiber(&mut self, fiber: Rc<RefCell<FiberNode>>) {
+    pub fn schedule_update_on_fiber(&self, fiber: Rc<RefCell<FiberNode>>) {
         let root = self.mark_update_lane_from_fiber_to_root(fiber);
         if root.is_none() {
             return;
@@ -68,11 +71,11 @@ impl WorkLoop {
         None
     }
 
-    fn ensure_root_is_scheduled(&mut self, root: Rc<RefCell<FiberRootNode>>) {
+    fn ensure_root_is_scheduled(&self, root: Rc<RefCell<FiberRootNode>>) {
         self.perform_sync_work_on_root(root);
     }
 
-    fn perform_sync_work_on_root(&mut self, root: Rc<RefCell<FiberRootNode>>) {
+    fn perform_sync_work_on_root(&self, root: Rc<RefCell<FiberRootNode>>) {
         self.prepare_fresh_stack(Rc::clone(&root));
 
         loop {
@@ -80,10 +83,10 @@ impl WorkLoop {
                 Ok(_) => {
                     break;
                 }
-                Err(e) => {
+                Err(e) => unsafe {
                     log!("work_loop error {:?}", e);
-                    self.work_in_progress = None;
-                }
+                    WORK_IN_PROGRESS = None
+                },
             };
         }
 
@@ -116,7 +119,7 @@ impl WorkLoop {
         let root_has_effect =
             get_mutation_mask().contains(finished_work.clone().borrow().flags.clone());
 
-        let mut commit_work = &mut CommitWork::new(self.complete_work.host_config.clone());
+        let commit_work = &mut CommitWork::new(self.complete_work.host_config.clone());
         if subtree_has_effect || root_has_effect {
             commit_work.commit_mutation_effects(finished_work.clone());
             cloned.borrow_mut().current = finished_work.clone();
@@ -125,33 +128,55 @@ impl WorkLoop {
         }
     }
 
-    fn prepare_fresh_stack(&mut self, root: Rc<RefCell<FiberRootNode>>) {
+    fn prepare_fresh_stack(&self, root: Rc<RefCell<FiberRootNode>>) {
         let root = Rc::clone(&root);
-        self.work_in_progress = Some(FiberNode::create_work_in_progress(
-            root.borrow().current.clone(),
-            Rc::new(JsValue::null()),
-        ));
+        // self.work_in_progress = Some(FiberNode::create_work_in_progress(
+        //     root.borrow().current.clone(),
+        //     Rc::new(JsValue::null()),
+        // ));
+        unsafe {
+            WORK_IN_PROGRESS = Some(FiberNode::create_work_in_progress(
+                root.borrow().current.clone(),
+                Rc::new(JsValue::null()),
+            ));
+            log!(
+                "prepare_fresh_stack {:?} {:?}",
+                WORK_IN_PROGRESS.clone().unwrap().clone().borrow()._type,
+                WORK_IN_PROGRESS
+                    .clone()
+                    .unwrap()
+                    .clone()
+                    .borrow()
+                    .memoized_state
+            );
+        }
     }
 
-    fn work_loop(&mut self) -> Result<(), JsValue> {
-        while self.work_in_progress.is_some() {
-            self.perform_unit_of_work(self.work_in_progress.clone().unwrap())?;
+    fn work_loop(&self) -> Result<(), JsValue> {
+        // while self.work_in_progress.is_some() {
+        //     self.perform_unit_of_work(self.work_in_progress.clone().unwrap())?;
+        // }
+        unsafe {
+            while WORK_IN_PROGRESS.is_some() {
+                self.perform_unit_of_work(WORK_IN_PROGRESS.clone().unwrap())?;
+            }
         }
         Ok(())
     }
 
-    fn perform_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) -> Result<(), JsValue> {
+    fn perform_unit_of_work(&self, fiber: Rc<RefCell<FiberNode>>) -> Result<(), JsValue> {
         let next = begin_work(fiber.clone())?;
 
         if next.is_none() {
             self.complete_unit_of_work(fiber.clone());
         } else {
-            self.work_in_progress = Some(next.unwrap());
+            // self.work_in_progress = Some(next.unwrap());
+            unsafe { WORK_IN_PROGRESS = Some(next.unwrap()) }
         }
         Ok(())
     }
 
-    fn complete_unit_of_work(&mut self, fiber: Rc<RefCell<FiberNode>>) {
+    fn complete_unit_of_work(&self, fiber: Rc<RefCell<FiberNode>>) {
         let mut node: Option<Rc<RefCell<FiberNode>>> = Some(fiber);
 
         loop {
@@ -160,13 +185,19 @@ impl WorkLoop {
                 .complete_work(node.clone().unwrap().clone());
 
             if next.is_some() {
-                self.work_in_progress = next.clone();
+                // self.work_in_progress = next.clone();
+                unsafe {
+                    WORK_IN_PROGRESS = next.clone();
+                }
                 return;
             }
 
             let sibling = node.clone().unwrap().clone().borrow().sibling.clone();
             if sibling.is_some() {
-                self.work_in_progress = next.clone();
+                // self.work_in_progress = next.clone();
+                unsafe {
+                    WORK_IN_PROGRESS = next.clone();
+                }
                 return;
             }
 
@@ -174,11 +205,17 @@ impl WorkLoop {
 
             if _return.is_none() {
                 node = None;
-                self.work_in_progress = None;
+                // self.work_in_progress = None;
+                unsafe {
+                    WORK_IN_PROGRESS = None;
+                }
                 break;
             } else {
                 node = _return;
-                self.work_in_progress = node.clone();
+                // self.work_in_progress = node.clone();
+                unsafe {
+                    WORK_IN_PROGRESS = node.clone();
+                }
             }
         }
     }

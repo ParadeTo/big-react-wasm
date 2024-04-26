@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::prelude::wasm_bindgen;
 
 use react_reconciler::fiber::FiberRootNode;
 use react_reconciler::Reconciler;

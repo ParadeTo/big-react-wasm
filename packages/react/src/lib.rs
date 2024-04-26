@@ -3,8 +3,12 @@ use wasm_bindgen::prelude::*;
 
 use shared::REACT_ELEMENT_TYPE;
 
+use crate::current_dispatcher::CURRENT_DISPATCHER;
+
+pub mod current_dispatcher;
+
 #[wasm_bindgen(js_name = jsxDEV)]
-pub fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
+pub unsafe fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
     let react_element = Object::new();
     Reflect::set(
         &react_element,
@@ -34,3 +38,11 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
     Reflect::set(&react_element, &"props".into(), &props).expect("props panic");
     react_element.into()
 }
+
+
+#[wasm_bindgen(js_name = useState)]
+pub unsafe fn use_state(initial_state: &JsValue) -> Result<JsValue, JsValue> {
+    let use_state = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_state;
+    use_state.call1(&JsValue::null(), initial_state)
+}
+

@@ -2,6 +2,8 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use shared::log;
+
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::{Flags, get_mutation_mask};
 use crate::HostConfig;
@@ -101,6 +103,7 @@ impl CommitWork {
         let fiber = fiber.clone();
         let tag = fiber.borrow().tag.clone();
         if tag == WorkTag::HostComponent || tag == WorkTag::HostText {
+            log!("{:?}", fiber.clone().borrow()._type);
             let state_node = fiber.clone().borrow().state_node.clone().unwrap();
             self.host_config.append_child_to_container(
                 self.get_element_from_state_node(state_node),

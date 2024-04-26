@@ -6,8 +6,8 @@ use wasm_bindgen::JsValue;
 use shared::derive_from_js_value;
 
 use crate::child_fiber::{mount_child_fibers, reconcile_child_fibers};
-use crate::fiber::FiberNode;
-use crate::fiber_hooks::FiberHooks;
+use crate::fiber::{FiberNode, MemoizedState};
+use crate::fiber_hooks::render_with_hooks;
 use crate::update_queue::process_update_queue;
 use crate::work_tags::WorkTag;
 
@@ -24,8 +24,7 @@ pub fn begin_work(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<Option<Rc<
 fn update_function_component(
     work_in_progress: Rc<RefCell<FiberNode>>,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
-    let fiber_hooks = &mut FiberHooks::new();
-    let next_children = Rc::new(fiber_hooks.render_with_hooks(work_in_progress.clone())?);
+    let next_children = Rc::new(render_with_hooks(work_in_progress.clone())?);
     reconcile_children(work_in_progress.clone(), Some(next_children));
     Ok(work_in_progress.clone().borrow().child.clone())
 }
@@ -33,7 +32,12 @@ fn update_function_component(
 fn update_host_root(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
     process_update_queue(work_in_progress.clone());
     let next_children = work_in_progress.clone().borrow().memoized_state.clone();
-    reconcile_children(work_in_progress.clone(), next_children);
+    if next_children.is_none() {
+        panic!("update_host_root next_children is none")
+    }
+    if let MemoizedState::JsValue(next_children) = next_children.unwrap() {
+        reconcile_children(work_in_progress.clone(), Some(next_children));
+    }
     work_in_progress.clone().borrow().child.clone()
 }
 

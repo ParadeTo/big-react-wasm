@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
@@ -6,11 +6,10 @@ use web_sys::js_sys::Function;
 
 use shared::log;
 
-use crate::fiber::FiberNode;
+use crate::fiber::{FiberNode, MemoizedState};
 
 #[derive(Clone, Debug)]
 pub struct UpdateAction;
-
 
 #[derive(Clone, Debug)]
 pub struct Update {
@@ -22,30 +21,33 @@ pub struct UpdateType {
     pub pending: Option<Update>,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct UpdateQueue {
     pub shared: UpdateType,
 }
 
-
 pub fn create_update(action: Rc<JsValue>) -> Update {
-    Update { action: Some(action) }
+    Update {
+        action: Some(action),
+    }
 }
 
-pub fn enqueue_update(fiber: Ref<FiberNode>, update: Update) {
-    if fiber.update_queue.is_some() {
-        let uq = fiber.update_queue.clone().unwrap();
-        let mut update_queue = uq.borrow_mut();
-        update_queue.shared.pending = Some(update);
-    }
+pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, update: Update) {
+    update_queue.borrow_mut().shared.pending = Option::from(update);
+}
+
+pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
+    Rc::new(RefCell::new(UpdateQueue {
+        shared: UpdateType {
+            pending: None,
+        },
+    }))
 }
 
 pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
     let rc_fiber = fiber.clone();
-    let mut fiber = rc_fiber.borrow_mut();
-    let mut new_state = None;
-    match fiber.update_queue.clone() {
+    let mut new_state = rc_fiber.borrow().memoized_state.clone();
+    match rc_fiber.borrow().update_queue.clone() {
         None => {
             log!("{:?} process_update_queue, update_queue is empty", fiber)
         }
@@ -60,8 +62,10 @@ pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
                     Some(action) => {
                         let f = action.dyn_ref::<Function>();
                         new_state = match f {
-                            None => Some(action.clone()),
-                            Some(f) => Some(Rc::new(f.call0(&JsValue::null()).unwrap())),
+                            None => Some(MemoizedState::JsValue(action.clone())),
+                            Some(f) => Some(MemoizedState::JsValue(Rc::new(
+                                f.call0(&JsValue::null()).unwrap(),
+                            ))),
                         }
                     }
                 }
@@ -69,5 +73,5 @@ pub fn process_update_queue(fiber: Rc<RefCell<FiberNode>>) {
         }
     }
 
-    fiber.memoized_state = new_state
+    fiber.clone().borrow_mut().memoized_state = new_state
 }
