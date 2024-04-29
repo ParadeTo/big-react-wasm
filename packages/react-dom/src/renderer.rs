@@ -23,6 +23,6 @@ impl Renderer {
 impl Renderer {
     pub fn render(&self, element: &JsValue) -> JsValue {
         self.reconciler
-            .update_container(Rc::new(element.clone()), self.root.clone())
+            .update_container(element.clone(), self.root.clone())
     }
 }

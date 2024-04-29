@@ -9,7 +9,7 @@
   "scripts": {
     "build": "node scripts/build.js",
     "build:test": "node scripts/build.js --test",
-    "test": "jest"
+    "test": "npm run build:test && jest"
   },
   "author": "",
   "license": "ISC",

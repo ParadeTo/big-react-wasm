@@ -3,12 +3,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
-use web_sys::js_sys::Reflect;
+use web_sys::js_sys::{Object, Reflect};
+
+use shared::{derive_from_js_value, log};
 
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::Flags;
-use crate::work_tags::WorkTag;
 use crate::HostConfig;
+use crate::work_tags::WorkTag;
 
 pub struct CompleteWork {
     pub host_config: Rc<dyn HostConfig>,
@@ -63,9 +65,9 @@ impl CompleteWork {
                 let node_cloned = node.clone().unwrap().clone();
                 if node_cloned.borrow()._return.is_none()
                     || Rc::ptr_eq(
-                        &node_cloned.borrow()._return.as_ref().unwrap(),
-                        &work_in_progress,
-                    )
+                    &node_cloned.borrow()._return.as_ref().unwrap(),
+                    &work_in_progress,
+                )
                 {
                     return;
                 }
@@ -110,12 +112,18 @@ impl CompleteWork {
         complete_work.clone().borrow_mut().subtree_flags |= subtree_flags.clone();
     }
 
+    fn mark_update(fiber: Rc<RefCell<FiberNode>>) {
+        fiber.borrow_mut().flags |= Flags::Update;
+    }
+
     pub fn complete_work(
         &self,
         work_in_progress: Rc<RefCell<FiberNode>>,
     ) -> Option<Rc<RefCell<FiberNode>>> {
-        let new_props = { work_in_progress.clone().borrow().pending_props.clone() };
-        let tag = { work_in_progress.clone().borrow().tag.clone() };
+        let work_in_progress_cloned = work_in_progress.clone();
+        let new_props = { work_in_progress_cloned.borrow().pending_props.clone() };
+        let current = { work_in_progress_cloned.borrow().alternate.clone() };
+        let tag = { work_in_progress_cloned.borrow().tag.clone() };
         match tag {
             WorkTag::FunctionComponent => {
                 self.bubble_properties(work_in_progress.clone());
@@ -126,32 +134,44 @@ impl CompleteWork {
                 None
             }
             WorkTag::HostComponent => {
-                let instance = self.host_config.create_instance(
-                    work_in_progress
-                        .clone()
-                        .borrow()
-                        ._type
-                        .clone()
-                        .unwrap()
-                        .clone()
-                        .as_string()
-                        .unwrap(),
-                );
-                self.append_all_children(instance.clone(), work_in_progress.clone());
-                work_in_progress.clone().borrow_mut().state_node =
-                    Some(Rc::new(StateNode::Element(instance.clone())));
+                if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
+                    log!("update properties")
+                } else {
+                    let instance = self.host_config.create_instance(
+                        work_in_progress
+                            .clone()
+                            .borrow()
+                            ._type
+                            .as_ref()
+                            .as_string()
+                            .unwrap(),
+                    );
+                    self.append_all_children(instance.clone(), work_in_progress.clone());
+                    work_in_progress.clone().borrow_mut().state_node =
+                        Some(Rc::new(StateNode::Element(instance.clone())));
+                }
+
                 self.bubble_properties(work_in_progress.clone());
                 None
             }
             WorkTag::HostText => {
-                let text_instance = self.host_config.create_text_instance(
-                    Reflect::get(&new_props.unwrap(), &JsValue::from_str("content"))
-                        .unwrap()
-                        .as_string()
-                        .unwrap(),
-                );
-                work_in_progress.clone().borrow_mut().state_node =
-                    Some(Rc::new(StateNode::Element(text_instance.clone())));
+                if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
+                    let old_text = derive_from_js_value(&current.clone().unwrap().clone().borrow().memoized_props, "content");
+                    let new_test = derive_from_js_value(&new_props, "content");
+                    if !Object::is(&old_text, &new_test) {
+                        CompleteWork::mark_update(work_in_progress.clone());
+                    }
+                } else {
+                    let text_instance = self.host_config.create_text_instance(
+                        Reflect::get(&new_props, &JsValue::from_str("content"))
+                            .unwrap()
+                            .as_string()
+                            .unwrap(),
+                    );
+                    work_in_progress.clone().borrow_mut().state_node =
+                        Some(Rc::new(StateNode::Element(text_instance.clone())));
+                }
+
                 self.bubble_properties(work_in_progress.clone());
                 None
             }

@@ -10,8 +10,8 @@ use crate::commit_work::CommitWork;
 use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::fiber_flags::get_mutation_mask;
-use crate::work_tags::WorkTag;
 use crate::HostConfig;
+use crate::work_tags::WorkTag;
 
 static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
 
@@ -137,7 +137,7 @@ impl WorkLoop {
         unsafe {
             WORK_IN_PROGRESS = Some(FiberNode::create_work_in_progress(
                 root.borrow().current.clone(),
-                Rc::new(JsValue::null()),
+                JsValue::null(),
             ));
             log!(
                 "prepare_fresh_stack {:?} {:?}",
@@ -166,7 +166,10 @@ impl WorkLoop {
 
     fn perform_unit_of_work(&self, fiber: Rc<RefCell<FiberNode>>) -> Result<(), JsValue> {
         let next = begin_work(fiber.clone())?;
-
+        let pending_props = {
+            fiber.clone().borrow().pending_props.clone()
+        };
+        fiber.clone().borrow_mut().memoized_props = pending_props;
         if next.is_none() {
             self.complete_unit_of_work(fiber.clone());
         } else {

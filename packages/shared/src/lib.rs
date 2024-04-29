@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use web_sys::js_sys::Reflect;
 use web_sys::wasm_bindgen::JsValue;
 
@@ -12,12 +10,12 @@ macro_rules! log {
     }
 }
 
-pub fn derive_from_js_value(js_value: Rc<JsValue>, str: &str) -> Option<Rc<JsValue>> {
+pub fn derive_from_js_value(js_value: &JsValue, str: &str) -> JsValue {
     match Reflect::get(&js_value, &JsValue::from_str(str)) {
-        Ok(v) => Some(Rc::new(v)),
+        Ok(v) => v,
         Err(_) => {
             log!("derive {} from {:?} error", str, js_value);
-            None
+            JsValue::undefined()
         }
     }
 }

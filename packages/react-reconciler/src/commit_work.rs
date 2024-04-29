@@ -2,12 +2,12 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use shared::log;
+use shared::{derive_from_js_value, log};
 
 use crate::fiber::{FiberNode, StateNode};
-use crate::fiber_flags::{get_mutation_mask, Flags};
-use crate::work_tags::WorkTag;
+use crate::fiber_flags::{Flags, get_mutation_mask};
 use crate::HostConfig;
+use crate::work_tags::WorkTag;
 
 pub struct CommitWork {
     next_effect: Option<Rc<RefCell<FiberNode>>>,
@@ -69,7 +69,121 @@ impl CommitWork {
         let flags = finished_work.clone().borrow().flags.clone();
         if flags.contains(Flags::Placement) {
             self.commit_placement(finished_work.clone());
-            finished_work.clone().borrow_mut().flags -= Flags::Placement
+            finished_work.clone().borrow_mut().flags -= Flags::Placement;
+        }
+
+        if flags.contains(Flags::ChildDeletion) {
+            let deletions = finished_work.clone().borrow().deletions.clone();
+            if deletions.is_some() {
+                let deletions = deletions.unwrap();
+                for child_to_delete in deletions {
+                    self.commit_deletion(child_to_delete);
+                }
+            }
+            finished_work.clone().borrow_mut().flags -= Flags::ChildDeletion;
+        }
+
+        if flags.contains(Flags::Update) {
+            self.commit_update(finished_work.clone());
+            finished_work.clone().borrow_mut().flags -= Flags::Update;
+        }
+    }
+
+    fn commit_update(&self, finished_work: Rc<RefCell<FiberNode>>) {
+        let cloned = finished_work.clone();
+        match cloned.borrow().tag {
+            WorkTag::HostText => {
+                let new_content = derive_from_js_value(&cloned.borrow().pending_props, "content");
+                let state_node = FiberNode::derive_state_node(finished_work.clone());
+                if let Some(state_node) = state_node.clone() {
+                    self.host_config
+                        .commit_text_update(state_node.clone(), new_content.as_string().unwrap())
+                }
+            }
+            _ => log!("commit_update, unsupported type"),
+        };
+    }
+
+    fn commit_deletion(&self, child_to_delete: Rc<RefCell<FiberNode>>) {
+        let first_host_fiber: Rc<RefCell<Option<Rc<RefCell<FiberNode>>>>> = Rc::new(RefCell::new(None));
+        self.commit_nested_unmounts(child_to_delete.clone(), |unmount_fiber| {
+            let cloned = first_host_fiber.clone();
+            match unmount_fiber.borrow().tag {
+                WorkTag::FunctionComponent => {}
+                WorkTag::HostRoot => {}
+                WorkTag::HostComponent => {
+                    if cloned.borrow().is_none() {
+                        *cloned.borrow_mut() = Some(unmount_fiber.clone());
+                    }
+                }
+                WorkTag::HostText => {
+                    if cloned.borrow().is_none() {
+                        *cloned.borrow_mut() = Some(unmount_fiber.clone());
+                    }
+                }
+            };
+        });
+
+        let first_host_fiber = first_host_fiber.clone();
+        if first_host_fiber.borrow().is_some() {
+            let host_parent_state_node = FiberNode::derive_state_node(
+                self.get_host_parent(child_to_delete.clone()).unwrap(),
+            );
+            let first_host_fiber_state_node =
+                FiberNode::derive_state_node((*first_host_fiber.borrow()).clone().unwrap());
+            self.host_config.remove_child(
+                first_host_fiber_state_node.unwrap(),
+                host_parent_state_node.unwrap(),
+            )
+        }
+
+        child_to_delete.clone().borrow_mut()._return = None;
+        child_to_delete.clone().borrow_mut().child = None;
+    }
+
+
+    fn commit_nested_unmounts<F>(&self, root: Rc<RefCell<FiberNode>>, on_commit_unmount: F)
+        where
+            F: Fn(Rc<RefCell<FiberNode>>),
+    {
+        let mut node = root.clone();
+        loop {
+            on_commit_unmount(node.clone());
+
+            let node_cloned = node.clone();
+            if node_cloned.borrow().child.is_some() {
+                node_cloned
+                    .borrow_mut()
+                    .child
+                    .clone()
+                    .unwrap()
+                    .clone()
+                    .borrow_mut()
+                    ._return = Some(node.clone());
+                node = node_cloned.borrow().child.clone().unwrap();
+                continue;
+            }
+            if Rc::ptr_eq(&node, &root.clone()) {
+                return;
+            }
+            while node.clone().borrow().sibling.is_none() {
+                if node.clone().borrow()._return.is_none()
+                    || Rc::ptr_eq(node.clone().borrow()._return.as_ref().unwrap(), &root)
+                {
+                    return;
+                }
+                node = node.clone().borrow()._return.clone().unwrap();
+            }
+
+            node_cloned
+                .borrow_mut()
+                .sibling
+                .clone()
+                .unwrap()
+                .clone()
+                .borrow_mut()
+                ._return = node_cloned.borrow()._return.clone();
+            node = node_cloned.borrow().sibling.clone().unwrap();
         }
     }
 
@@ -103,7 +217,6 @@ impl CommitWork {
         let fiber = fiber.clone();
         let tag = fiber.borrow().tag.clone();
         if tag == WorkTag::HostComponent || tag == WorkTag::HostText {
-            log!("{:?}", fiber.clone().borrow()._type);
             let state_node = fiber.clone().borrow().state_node.clone().unwrap();
             self.host_config.append_child_to_container(
                 self.get_element_from_state_node(state_node),
