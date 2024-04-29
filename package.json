@@ -7,7 +7,7 @@
     "example": "examples"
   },
   "scripts": {
-    "build": "node scripts/build.js",
+    "build:dev": "ENV=dev node scripts/build.js",
     "build:test": "node scripts/build.js --test",
     "test": "npm run build:test && jest"
   },

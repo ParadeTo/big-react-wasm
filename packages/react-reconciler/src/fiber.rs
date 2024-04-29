@@ -22,7 +22,7 @@ pub enum StateNode {
 }
 
 #[derive(Debug, Clone)]
-pub enum MemoizedState {
+pub(crate) enum MemoizedState {
     JsValue(JsValue),
     Hook(Rc<RefCell<Hook>>),
 }

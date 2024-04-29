@@ -15,7 +15,7 @@ mod child_fiber;
 mod commit_work;
 mod complete_work;
 pub mod fiber;
-pub mod fiber_flags;
+mod fiber_flags;
 mod fiber_hooks;
 mod update_queue;
 mod work_loop;
@@ -23,7 +23,7 @@ mod work_tags;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: String) -> Rc<dyn Any>;
-    fn create_instance(&self, _type: String) -> Rc<dyn Any>;
+    fn create_instance(&self, _type: String, props: Rc<dyn Any>) -> Rc<dyn Any>;
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>);
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>);
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>);

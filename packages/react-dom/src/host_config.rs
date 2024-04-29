@@ -1,10 +1,13 @@
 use std::any::Any;
 use std::rc::Rc;
 
+use wasm_bindgen::JsValue;
 use web_sys::{Node, window};
 
 use react_reconciler::HostConfig;
 use shared::log;
+
+use crate::synthetic_event::update_event_props;
 
 pub struct ReactDomHostConfig;
 
@@ -15,11 +18,17 @@ impl HostConfig for ReactDomHostConfig {
         Rc::new(Node::from(document.create_text_node(content.as_str())))
     }
 
-    fn create_instance(&self, _type: String) -> Rc<dyn Any> {
+    fn create_instance(&self, _type: String, props: Rc<dyn Any>) -> Rc<dyn Any> {
         let window = window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
         match document.create_element(_type.as_ref()) {
-            Ok(element) => Rc::new(Node::from(element)),
+            Ok(element) => {
+                let element = update_event_props(
+                    element.clone(),
+                    &*props.clone().downcast::<JsValue>().unwrap(),
+                );
+                Rc::new(Node::from(element))
+            }
             Err(_) => todo!(),
         }
     }

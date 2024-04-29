@@ -145,6 +145,7 @@ impl CompleteWork {
                             .as_ref()
                             .as_string()
                             .unwrap(),
+                        Rc::new(new_props),
                     );
                     self.append_all_children(instance.clone(), work_in_progress.clone());
                     work_in_progress.clone().borrow_mut().state_node =
