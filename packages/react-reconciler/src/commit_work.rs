@@ -141,14 +141,6 @@ impl CommitWork {
         child_to_delete.clone().borrow_mut().child = None;
     }
 
-    fn on_commit_unmount(unmount_fiber: Rc<RefCell<FiberNode>>) {
-        match unmount_fiber.clone().borrow().tag {
-            WorkTag::FunctionComponent => {}
-            WorkTag::HostRoot => {}
-            WorkTag::HostComponent => {}
-            WorkTag::HostText => {}
-        };
-    }
 
     fn commit_nested_unmounts<F>(&self, root: Rc<RefCell<FiberNode>>, on_commit_unmount: F)
         where
@@ -174,13 +166,13 @@ impl CommitWork {
             if Rc::ptr_eq(&node, &root.clone()) {
                 return;
             }
-            while node_cloned.borrow().sibling.is_none() {
-                if node_cloned.borrow()._return.is_none()
-                    || Rc::ptr_eq(node_cloned.borrow()._return.as_ref().unwrap(), &root)
+            while node.clone().borrow().sibling.is_none() {
+                if node.clone().borrow()._return.is_none()
+                    || Rc::ptr_eq(node.clone().borrow()._return.as_ref().unwrap(), &root)
                 {
                     return;
                 }
-                node = node_cloned.borrow()._return.clone().unwrap();
+                node = node.clone().borrow()._return.clone().unwrap();
             }
 
             node_cloned

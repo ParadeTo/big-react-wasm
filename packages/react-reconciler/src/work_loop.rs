@@ -91,7 +91,7 @@ impl WorkLoop {
         }
 
         log!("{:?}", *root.clone().borrow());
-        
+
         let finished_work = {
             root.clone()
                 .borrow()
@@ -166,7 +166,10 @@ impl WorkLoop {
 
     fn perform_unit_of_work(&self, fiber: Rc<RefCell<FiberNode>>) -> Result<(), JsValue> {
         let next = begin_work(fiber.clone())?;
-
+        let pending_props = {
+            fiber.clone().borrow().pending_props.clone()
+        };
+        fiber.clone().borrow_mut().memoized_props = pending_props;
         if next.is_none() {
             self.complete_unit_of_work(fiber.clone());
         } else {

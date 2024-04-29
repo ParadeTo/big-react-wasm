@@ -231,13 +231,13 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
         }
     }
     let queue = create_update_queue();
+    hook.as_ref().unwrap().clone().borrow_mut().update_queue = Some(queue.clone());
     let q_rc = Rc::new(queue.clone());
     let q_rc_cloned = q_rc.clone();
-    hook.as_ref().unwrap().clone().borrow_mut().update_queue = Some(queue.clone());
     let fiber = unsafe {
         CURRENTLY_RENDERING_FIBER.clone().unwrap()
     };
-    let closure = Closure::wrap(Box::new(move |action: &JsValue| unsafe {
+    let closure = Closure::wrap(Box::new(move |action: &JsValue| {
         dispatch_set_state(
             fiber.clone(),
             (*q_rc_cloned).clone(),
@@ -292,7 +292,6 @@ fn dispatch_set_state(
 ) {
     let update = create_update(action.clone());
     enqueue_update(update_queue.clone(), update);
-    log!("{:?} {:?}", update_queue.clone(), fiber.clone().borrow().update_queue.clone());
     unsafe {
         WORK_LOOP
             .as_ref()
