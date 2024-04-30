@@ -12,6 +12,7 @@ use crate::utils::set_panic_hook;
 mod host_config;
 mod renderer;
 mod utils;
+mod synthetic_event;
 
 #[wasm_bindgen(js_name = createRoot)]
 pub fn create_root(container: &JsValue) -> Renderer {
@@ -24,6 +25,6 @@ pub fn create_root(container: &JsValue) -> Renderer {
         }
     };
     let root = reconciler.create_container(Rc::new(node));
-    let renderer = Renderer::new(root, reconciler);
+    let renderer = Renderer::new(root, reconciler, container);
     renderer
 }

@@ -145,6 +145,7 @@ impl CompleteWork {
                             .as_ref()
                             .as_string()
                             .unwrap(),
+                        Rc::new(new_props),
                     );
                     self.append_all_children(instance.clone(), work_in_progress.clone());
                     work_in_progress.clone().borrow_mut().state_node =
@@ -163,10 +164,8 @@ impl CompleteWork {
                     }
                 } else {
                     let text_instance = self.host_config.create_text_instance(
-                        Reflect::get(&new_props, &JsValue::from_str("content"))
+                        &Reflect::get(&new_props, &JsValue::from_str("content"))
                             .unwrap()
-                            .as_string()
-                            .unwrap(),
                     );
                     work_in_progress.clone().borrow_mut().state_node =
                         Some(Rc::new(StateNode::Element(text_instance.clone())));

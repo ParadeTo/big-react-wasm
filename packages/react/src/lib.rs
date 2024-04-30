@@ -1,4 +1,4 @@
-use js_sys::{Object, Reflect, JSON};
+use js_sys::{JSON, Object, Reflect};
 use wasm_bindgen::prelude::*;
 
 use shared::REACT_ELEMENT_TYPE;
@@ -35,7 +35,7 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
         &"$$typeof".into(),
         &JsValue::from_str(REACT_ELEMENT_TYPE),
     )
-    .expect("$$typeof panic");
+        .expect("$$typeof panic");
     Reflect::set(&react_element, &"type".into(), _type).expect("type panic");
 
     let props = Object::new();
@@ -82,11 +82,11 @@ pub fn is_valid_element(object: &JsValue) -> bool {
     object.is_object()
         && !object.is_null()
         && Reflect::get(&object, &"$$typeof".into())
-            .unwrap_or("".into())
-            .as_string()
-            .unwrap_or("".into())
-            .as_str()
-            == REACT_ELEMENT_TYPE
+        .unwrap_or("".into())
+        .as_string()
+        .unwrap_or("".into())
+        .as_str()
+        == REACT_ELEMENT_TYPE
 }
 
 #[wasm_bindgen(js_name = useState)]

@@ -4,7 +4,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::{Object, Reflect};
 
-use shared::{derive_from_js_value, log, REACT_ELEMENT_TYPE};
+use shared::{derive_from_js_value, log, REACT_ELEMENT_TYPE, type_of};
 
 use crate::fiber::FiberNode;
 use crate::fiber_flags::Flags;
@@ -131,6 +131,7 @@ fn reconcile_single_text_node(
     Rc::new(RefCell::new(created))
 }
 
+
 fn _reconcile_child_fibers(
     return_fiber: Rc<RefCell<FiberNode>>,
     current_first_child: Option<Rc<RefCell<FiberNode>>>,
@@ -140,7 +141,7 @@ fn _reconcile_child_fibers(
     if new_child.is_some() {
         let new_child = &new_child.unwrap();
 
-        if new_child.is_string() {
+        if type_of(new_child, "string") || type_of(new_child, "number") {
             return Some(place_single_child(
                 reconcile_single_text_node(
                     return_fiber,
