@@ -8,11 +8,18 @@ function App() {
 
     return (
         <h3
-            onClick={(e) => {
+            onClickCapture={(e) => {
+                e.stopPropagation()
+                console.log('click h3', e.currentTarget)
                 updateNum(prev => prev + 1);
             }}
         >
-            {isOdd ? <div>odd</div> : <p>even</p>}
+            <div onClick={(e) => {
+                console.log('click div', e.currentTarget)
+            }}>
+                {isOdd ? <div>odd</div> : <p>even</p>}
+            </div>
+
         </h3>
     );
 }
