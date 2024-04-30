@@ -5,7 +5,7 @@ function App() {
     const [num, updateNum] = useState(0);
 
     const isOdd = num % 2;
-    console.log(isOdd)
+
     return (
         <h3
             onClick={(e) => {

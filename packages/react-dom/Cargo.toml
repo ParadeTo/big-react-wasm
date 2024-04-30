@@ -21,6 +21,7 @@ shared = { path = "../shared" }
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.7", optional = true }
 gloo = "0.11.0"
+js-sys = "0.3.69"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"

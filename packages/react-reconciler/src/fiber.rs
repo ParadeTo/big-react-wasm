@@ -120,21 +120,17 @@ impl FiberNode {
             let mut wip = {
                 let c = c_rc.borrow();
                 let mut wip = FiberNode::new(c.tag.clone(), pending_props, c.key.clone());
-                wip.update_queue = match c.update_queue.as_ref() {
-                    None => None,
-                    Some(update_queue) => {
-                        Some(update_queue.clone())
-                    }
-                };
+                wip._type = c._type.clone();
+                wip.state_node = c.state_node.clone();
+
+                wip.update_queue = c.update_queue.clone();
                 wip.flags = c.flags.clone();
                 wip.child = c.child.clone();
                 wip.memoized_props = c.memoized_props.clone();
                 wip.memoized_state = c.memoized_state.clone();
+                wip.alternate = Some(current);
                 wip
             };
-            wip._type = c_rc.borrow()._type.clone();
-            wip.state_node = c_rc.borrow().state_node.clone();
-            wip.alternate = Some(current);
             let wip_rc = Rc::new(RefCell::new(wip));
             {
                 let mut fibler_node = c_rc.borrow_mut();
@@ -148,6 +144,11 @@ impl FiberNode {
                 let mut wip = wip_cloned.borrow_mut();
                 let c = c_rc.borrow();
                 wip.pending_props = pending_props;
+                wip.flags = Flags::NoFlags;
+                wip.subtree_flags = Flags::NoFlags;
+                wip.deletions = None;
+                wip._type = c._type.clone();
+
                 wip.update_queue = c.update_queue.clone();
                 wip.flags = c.flags.clone();
                 wip.child = c.child.clone();
