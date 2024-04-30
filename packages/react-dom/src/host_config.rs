@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 use web_sys::{Node, window};
+use web_sys::js_sys::JSON::stringify;
 
 use react_reconciler::HostConfig;
 use shared::log;
@@ -12,10 +13,12 @@ use crate::synthetic_event::update_event_props;
 pub struct ReactDomHostConfig;
 
 impl HostConfig for ReactDomHostConfig {
-    fn create_text_instance(&self, content: String) -> Rc<dyn Any> {
+    fn create_text_instance(&self, content: &JsValue) -> Rc<dyn Any> {
         let window = window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        Rc::new(Node::from(document.create_text_node(content.as_str())))
+        Rc::new(Node::from(document.create_text_node(
+            stringify(content).unwrap().as_string().unwrap().as_str(),
+        )))
     }
 
     fn create_instance(&self, _type: String, props: Rc<dyn Any>) -> Rc<dyn Any> {

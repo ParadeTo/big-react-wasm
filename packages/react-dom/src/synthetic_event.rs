@@ -76,7 +76,8 @@ fn dispatch_event(container: &Element, event_type: String, e: &Event) {
     trigger_event_flow(capture, &se);
     if !derive_from_js_value(&se, "__stopPropagation")
         .as_bool()
-        .unwrap() {
+        .unwrap()
+    {
         if is_dev() {
             log!("Event {} bubble phase", event_type);
         }
@@ -90,7 +91,7 @@ fn collect_paths(
     event_type: &str,
 ) -> Paths {
     let mut paths = Paths::new();
-    while target_element.is_some() && Object::is(target_element.as_ref().unwrap(), container) {
+    while target_element.is_some() && !Object::is(target_element.as_ref().unwrap(), container) {
         let event_props =
             derive_from_js_value(target_element.as_ref().unwrap(), ELEMENT_EVENT_PROPS_KEY);
         if event_props.is_object() {
@@ -143,7 +144,7 @@ pub fn init_event(container: JsValue, event_type: String) {
 
 pub fn update_event_props(node: Element, props: &JsValue) -> Element {
     let js_value = derive_from_js_value(&node, ELEMENT_EVENT_PROPS_KEY);
-    let element_event_props = if !js_value.is_object() {
+    let element_event_props = if js_value.is_object() {
         js_value.dyn_into::<Object>().unwrap()
     } else {
         Object::new()
@@ -155,12 +156,18 @@ pub fn update_event_props(node: Element, props: &JsValue) -> Element {
         }
 
         for callback_name in callback_name_list.clone().unwrap() {
-            if element_event_props.has_own_property(&callback_name.into()) {
+            if props.is_object()
+                && props
+                .dyn_ref::<Object>()
+                .unwrap()
+                .has_own_property(&callback_name.into())
+            {
                 let callback = derive_from_js_value(props, callback_name);
                 Reflect::set(&element_event_props, &callback_name.into(), &callback);
             }
         }
     }
     Reflect::set(&node, &ELEMENT_EVENT_PROPS_KEY.into(), &element_event_props);
+
     node
 }

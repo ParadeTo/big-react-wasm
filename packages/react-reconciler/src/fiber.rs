@@ -148,7 +148,7 @@ impl FiberNode {
                 let mut wip = wip_cloned.borrow_mut();
                 let c = c_rc.borrow();
                 wip.pending_props = pending_props;
-                wip.update_queue = Some(c.update_queue.as_ref().unwrap().clone());
+                wip.update_queue = c.update_queue.clone();
                 wip.flags = c.flags.clone();
                 wip.child = c.child.clone();
                 wip.memoized_props = c.memoized_props.clone();
@@ -242,8 +242,6 @@ impl Debug for FiberRootNode {
                                 current_borrowed.pending_props.as_ref(),
                                 &JsValue::from_str("content"),
                             )
-                                .unwrap()
-                                .as_string()
                                 .unwrap(),
                             current_borrowed.flags
                         )

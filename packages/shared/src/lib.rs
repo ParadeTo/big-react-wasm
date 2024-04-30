@@ -23,3 +23,25 @@ pub fn derive_from_js_value(js_value: &JsValue, str: &str) -> JsValue {
 pub fn is_dev() -> bool {
     env!("ENV") == "dev"
 }
+
+
+pub fn type_of(val: &JsValue, _type: &str) -> bool {
+    let t = if val.is_undefined() {
+        "undefined".to_string()
+    } else if val.is_null() {
+        "null".to_string()
+    } else if val.as_bool().is_some() {
+        "boolean".to_string()
+    } else if val.as_f64().is_some() {
+        "number".to_string()
+    } else if val.as_string().is_some() {
+        "string".to_string()
+    } else if val.is_function() {
+        "function".to_string()
+    } else if val.is_object() {
+        "object".to_string()
+    } else {
+        "unknown".to_string()
+    };
+    t == _type
+}
