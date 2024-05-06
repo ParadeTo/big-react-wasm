@@ -1,7 +1,7 @@
 use js_sys::{Array, JSON, Object, Reflect};
 use wasm_bindgen::prelude::*;
 
-use shared::{derive_from_js_value, log, REACT_ELEMENT_TYPE};
+use shared::{derive_from_js_value, REACT_ELEMENT_TYPE};
 
 use crate::current_dispatcher::CURRENT_DISPATCHER;
 
@@ -68,7 +68,6 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
 
     Reflect::set(&react_element, &"ref".into(), &_ref).expect("ref panic");
     Reflect::set(&react_element, &"key".into(), &key).expect("key panic");
-    log!("react_element2 {:?}", react_element);
     react_element.into()
 }
 
@@ -88,8 +87,6 @@ pub fn jsx(_type: &JsValue, config: &JsValue, maybe_children: &JsValue) -> JsVal
             if length != 0.0 {
                 if length == 1.0 {
                     let children = maybe_children.dyn_ref::<Array>().unwrap();
-                    log!("children {:?}", children.get(0));
-
                     Reflect::set(&config, &"children".into(), &children.get(0)).expect("TODO: panic children");
                 } else {
                     Reflect::set(&config, &"children".into(), maybe_children);
@@ -97,8 +94,6 @@ pub fn jsx(_type: &JsValue, config: &JsValue, maybe_children: &JsValue) -> JsVal
             }
         }
     };
-    log!("react_element1 config {:?}", config);
-
     jsx_dev(_type, config, &JsValue::undefined())
 }
 
