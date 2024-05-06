@@ -113,7 +113,7 @@ fn reconcile_single_element(
                 existing.clone().borrow_mut()._return = Some(return_fiber.clone());
                 delete_remaining_children(
                     return_fiber.clone(),
-                    current.clone(),
+                    current.clone().unwrap().borrow().sibling.clone(),
                     should_track_effects,
                 );
                 return existing;
@@ -154,6 +154,11 @@ fn reconcile_single_text_node(
         if current_rc.borrow().tag == HostText {
             let existing = use_fiber(current_rc.clone(), props.clone());
             existing.borrow_mut()._return = Some(return_fiber.clone());
+            delete_remaining_children(
+                return_fiber.clone(),
+                current_rc.borrow().sibling.clone(),
+                should_track_effects,
+            );
             return existing;
         }
         delete_child(
