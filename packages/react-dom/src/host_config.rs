@@ -8,7 +8,7 @@ use web_sys::{Node, window};
 use react_reconciler::HostConfig;
 use shared::{log, type_of};
 
-use crate::synthetic_event::update_event_props;
+use crate::synthetic_event::update_fiber_props;
 
 pub struct ReactDomHostConfig;
 
@@ -45,7 +45,7 @@ impl HostConfig for ReactDomHostConfig {
         let document = window.document().expect("should have a document on window");
         match document.create_element(_type.as_ref()) {
             Ok(element) => {
-                let element = update_event_props(
+                let element = update_fiber_props(
                     element.clone(),
                     &*props.clone().downcast::<JsValue>().unwrap(),
                 );

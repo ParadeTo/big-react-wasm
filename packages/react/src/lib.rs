@@ -1,7 +1,7 @@
-use js_sys::{JSON, Object, Reflect};
+use js_sys::{Array, JSON, Object, Reflect};
 use wasm_bindgen::prelude::*;
 
-use shared::REACT_ELEMENT_TYPE;
+use shared::{derive_from_js_value, log, REACT_ELEMENT_TYPE};
 
 use crate::current_dispatcher::CURRENT_DISPATCHER;
 
@@ -68,14 +68,40 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
 
     Reflect::set(&react_element, &"ref".into(), &_ref).expect("ref panic");
     Reflect::set(&react_element, &"key".into(), &key).expect("key panic");
-
+    log!("react_element2 {:?}", react_element);
     react_element.into()
 }
 
-#[wasm_bindgen(js_name = createElement)]
-pub fn create_element(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
-    jsx_dev(_type, config, key)
+#[wasm_bindgen(js_name = createElement, variadic)]
+pub fn create_element(_type: &JsValue, config: &JsValue, maybe_children: &JsValue) -> JsValue {
+    jsx(_type, config, maybe_children)
 }
+
+#[wasm_bindgen(variadic)]
+pub fn jsx(_type: &JsValue, config: &JsValue, maybe_children: &JsValue) -> JsValue {
+    let length = derive_from_js_value(maybe_children, "length");
+    let obj = Object::new();
+    let config = if config.is_object() { config } else { &*obj };
+    match length.as_f64() {
+        None => {}
+        Some(length) => {
+            if length != 0.0 {
+                if length == 1.0 {
+                    let children = maybe_children.dyn_ref::<Array>().unwrap();
+                    log!("children {:?}", children.get(0));
+
+                    Reflect::set(&config, &"children".into(), &children.get(0)).expect("TODO: panic children");
+                } else {
+                    Reflect::set(&config, &"children".into(), maybe_children);
+                }
+            }
+        }
+    };
+    log!("react_element1 config {:?}", config);
+
+    jsx_dev(_type, config, &JsValue::undefined())
+}
+
 
 #[wasm_bindgen(js_name = isValidElement)]
 pub fn is_valid_element(object: &JsValue) -> bool {

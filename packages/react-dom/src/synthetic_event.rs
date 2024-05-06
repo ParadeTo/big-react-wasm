@@ -142,7 +142,7 @@ pub fn init_event(container: JsValue, event_type: String) {
     on_click.forget();
 }
 
-pub fn update_event_props(node: Element, props: &JsValue) -> Element {
+pub fn update_fiber_props(node: Element, props: &JsValue) -> Element {
     let js_value = derive_from_js_value(&node, ELEMENT_EVENT_PROPS_KEY);
     let element_event_props = if js_value.is_object() {
         js_value.dyn_into::<Object>().unwrap()

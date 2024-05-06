@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build:dev": "ENV=dev node scripts/build.js",
-    "build:test": "node scripts/build.js --test",
+    "build:test": "ENV=test node scripts/build.js --test",
     "test": "npm run build:test && jest"
   },
   "author": "",
