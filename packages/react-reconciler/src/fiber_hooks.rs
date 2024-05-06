@@ -141,29 +141,23 @@ fn update_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
 
                 match current {
                     None => None,
-                    Some(current) => {
-                        match current.clone().borrow().memoized_state.clone() {
-                            Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
-                            _ => None,
-                        }
-                    }
+                    Some(current) => match current.clone().borrow().memoized_state.clone() {
+                        Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
+                        _ => None,
+                    },
                 }
             }
             Some(current_hook) => current_hook.clone().borrow().next.clone(),
         };
 
         next_work_in_progress_hook = match &WORK_IN_PROGRESS_HOOK {
-            None => {
-                match CURRENTLY_RENDERING_FIBER.clone() {
-                    Some(current) => {
-                        match current.clone().borrow().memoized_state.clone() {
-                            Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
-                            _ => None,
-                        }
-                    }
+            None => match CURRENTLY_RENDERING_FIBER.clone() {
+                Some(current) => match current.clone().borrow().memoized_state.clone() {
+                    Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
                     _ => None,
-                }
-            }
+                },
+                _ => None,
+            },
             Some(work_in_progress_hook) => work_in_progress_hook.clone().borrow().next.clone(),
         };
 
@@ -223,7 +217,7 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
         memoized_state = initial_state.clone();
     }
     hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
-        Some(MemoizedState::JsValue(memoized_state.clone()));
+        Some(MemoizedState::MemoizedJsValue(memoized_state.clone()));
 
     unsafe {
         if CURRENTLY_RENDERING_FIBER.is_none() {
@@ -234,15 +228,9 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     hook.as_ref().unwrap().clone().borrow_mut().update_queue = Some(queue.clone());
     let q_rc = Rc::new(queue.clone());
     let q_rc_cloned = q_rc.clone();
-    let fiber = unsafe {
-        CURRENTLY_RENDERING_FIBER.clone().unwrap()
-    };
+    let fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap() };
     let closure = Closure::wrap(Box::new(move |action: &JsValue| {
-        dispatch_set_state(
-            fiber.clone(),
-            (*q_rc_cloned).clone(),
-            action,
-        )
+        dispatch_set_state(fiber.clone(), (*q_rc_cloned).clone(), action)
     }) as Box<dyn Fn(&JsValue)>);
     let function = closure.as_ref().unchecked_ref::<Function>().clone();
     closure.forget();
@@ -252,7 +240,7 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     Ok(vec![memoized_state, function.into()])
 }
 
-fn update_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
+fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     let hook = update_work_in_progress_hook();
 
     if hook.is_none() {
@@ -274,13 +262,16 @@ fn update_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     log!("memoized_state {:?}", hook_cloned.borrow().memoized_state);
 
     Ok(vec![
-        hook.clone().unwrap().clone()
+        hook.clone()
+            .unwrap()
+            .clone()
             .borrow()
             .memoized_state
             .clone()
             .unwrap()
             .js_value()
-            .unwrap().clone(),
+            .unwrap()
+            .clone(),
         queue.clone().unwrap().borrow().dispatch.clone().into(),
     ])
 }

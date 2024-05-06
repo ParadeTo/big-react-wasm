@@ -35,9 +35,9 @@ impl HostConfig for ReactDomHostConfig {
     fn create_text_instance(&self, content: &JsValue) -> Rc<dyn Any> {
         let window = window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        Rc::new(Node::from(document.create_text_node(
-            to_string(content).as_str()
-        )))
+        Rc::new(Node::from(
+            document.create_text_node(to_string(content).as_str()),
+        ))
     }
 
     fn create_instance(&self, _type: String, props: Rc<dyn Any>) -> Rc<dyn Any> {
@@ -51,7 +51,9 @@ impl HostConfig for ReactDomHostConfig {
                 );
                 Rc::new(Node::from(element))
             }
-            Err(_) => todo!(),
+            Err(_) => {
+                panic!("Failed to create_instance {:?}", _type);
+            }
         }
     }
 
@@ -59,10 +61,10 @@ impl HostConfig for ReactDomHostConfig {
         let p = parent.clone().downcast::<Node>().unwrap();
         let c = child.clone().downcast::<Node>().unwrap();
         match p.append_child(&c) {
-            Ok(_) => {
-                log!("append_initial_child successfully {:?} {:?}", p, c);
+            Ok(_) => {}
+            Err(_) => {
+                log!("Failed to append_initial_child {:?} {:?}", p, c);
             }
-            Err(_) => todo!(),
         }
     }
 
@@ -74,15 +76,36 @@ impl HostConfig for ReactDomHostConfig {
         let p = container.clone().downcast::<Node>().unwrap();
         let c = child.clone().downcast::<Node>().unwrap();
         match p.remove_child(&c) {
-            Ok(_) => {
-                log!("remove_child successfully {:?} {:?}", p, c);
+            Ok(_) => {}
+            Err(e) => {
+                log!("Failed to remove_child {:?} {:?} {:?} ", e, p, c);
             }
-            Err(_) => todo!(),
         }
     }
 
     fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String) {
         let text_instance = text_instance.clone().downcast::<Node>().unwrap();
         text_instance.set_node_value(Some(content.as_str()));
+    }
+
+    fn insert_child_to_container(
+        &self,
+        child: Rc<dyn Any>,
+        container: Rc<dyn Any>,
+        before: Rc<dyn Any>,
+    ) {
+        let parent = container.clone().downcast::<Node>().unwrap();
+        let before = before.clone().downcast::<Node>().unwrap();
+        let child = child.clone().downcast::<Node>().unwrap();
+        match parent.insert_before(&before, Some(&child)) {
+            Ok(_) => {}
+            Err(_) => {
+                log!(
+                    "Failed to insert_child_to_container {:?} {:?}",
+                    parent,
+                    child
+                );
+            }
+        }
     }
 }

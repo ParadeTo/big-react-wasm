@@ -157,15 +157,17 @@ impl CompleteWork {
             }
             WorkTag::HostText => {
                 if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
-                    let old_text = derive_from_js_value(&current.clone().unwrap().clone().borrow().memoized_props, "content");
+                    let old_text = derive_from_js_value(
+                        &current.clone().unwrap().clone().borrow().memoized_props,
+                        "content",
+                    );
                     let new_test = derive_from_js_value(&new_props, "content");
                     if !Object::is(&old_text, &new_test) {
                         CompleteWork::mark_update(work_in_progress.clone());
                     }
                 } else {
                     let text_instance = self.host_config.create_text_instance(
-                        &Reflect::get(&new_props, &JsValue::from_str("content"))
-                            .unwrap()
+                        &Reflect::get(&new_props, &JsValue::from_str("content")).unwrap(),
                     );
                     work_in_progress.clone().borrow_mut().state_node =
                         Some(Rc::new(StateNode::Element(text_instance.clone())));

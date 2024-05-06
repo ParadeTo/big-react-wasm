@@ -87,16 +87,16 @@ pub fn jsx(_type: &JsValue, config: &JsValue, maybe_children: &JsValue) -> JsVal
             if length != 0.0 {
                 if length == 1.0 {
                     let children = maybe_children.dyn_ref::<Array>().unwrap();
-                    Reflect::set(&config, &"children".into(), &children.get(0)).expect("TODO: panic children");
+                    Reflect::set(&config, &"children".into(), &children.get(0))
+                        .expect("TODO: panic children");
                 } else {
-                    Reflect::set(&config, &"children".into(), maybe_children);
+                    Reflect::set(&config, &"children".into(), maybe_children).expect("TODO: panic set children");
                 }
             }
         }
     };
     jsx_dev(_type, config, &JsValue::undefined())
 }
-
 
 #[wasm_bindgen(js_name = isValidElement)]
 pub fn is_valid_element(object: &JsValue) -> bool {

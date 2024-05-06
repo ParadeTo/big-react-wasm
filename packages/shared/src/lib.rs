@@ -24,7 +24,6 @@ pub fn is_dev() -> bool {
     env!("ENV") == "dev"
 }
 
-
 pub fn type_of(val: &JsValue, _type: &str) -> bool {
     let t = if val.is_undefined() {
         "undefined".to_string()

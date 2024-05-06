@@ -25,7 +25,7 @@ describe('ReactFunctionComponent', () => {
         ReactTestUtils = require('../utils/test-utils')
     });
 
-    it.only('should render stateless component', () => {
+    it('should render stateless component', () => {
         const el = document.createElement('div');
         // console.log(FunctionComponent.toString())
         ReactDOM.createRoot(el).render(<FunctionComponent name="A"/>);

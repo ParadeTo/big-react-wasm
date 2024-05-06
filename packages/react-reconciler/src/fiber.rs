@@ -8,7 +8,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::derive_from_js_value;
+use shared::{derive_from_js_value, log, type_of};
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::Hook;
@@ -22,16 +22,16 @@ pub enum StateNode {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum MemoizedState {
-    JsValue(JsValue),
+pub enum MemoizedState {
+    MemoizedJsValue(JsValue),
     Hook(Rc<RefCell<Hook>>),
 }
 
 impl MemoizedState {
     pub fn js_value(&self) -> Option<JsValue> {
         match self {
-            MemoizedState::JsValue(js_value) => Some(js_value.clone()),
-            MemoizedState::Hook(_) => None
+            MemoizedState::MemoizedJsValue(js_value) => Some(js_value.clone()),
+            MemoizedState::Hook(_) => None,
         }
     }
 }
@@ -86,8 +86,9 @@ impl FiberNode {
         let mut fiber_tag = WorkTag::FunctionComponent;
         if _type.is_string() {
             fiber_tag = WorkTag::HostComponent
+        } else if !type_of(&_type, "function") {
+            log!("Unsupported type {:?}", ele);
         }
-
 
         let mut fiber = FiberNode::new(fiber_tag, props, key);
         fiber._type = _type;
@@ -117,7 +118,7 @@ impl FiberNode {
         };
 
         return if w.is_none() {
-            let mut wip = {
+            let wip = {
                 let c = c_rc.borrow();
                 let mut wip = FiberNode::new(c.tag.clone(), pending_props, c.key.clone());
                 wip._type = c._type.clone();
@@ -224,9 +225,7 @@ impl Debug for FiberRootNode {
                         write!(
                             f,
                             "{:?}(flags:{:?}, subtreeFlags:{:?})",
-                            current_borrowed
-                                ._type
-                                .as_ref().as_string().unwrap(),
+                            current_borrowed._type.as_ref().as_string().unwrap(),
                             current_borrowed.flags,
                             current_borrowed.subtree_flags
                         )

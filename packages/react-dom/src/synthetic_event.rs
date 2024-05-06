@@ -24,7 +24,7 @@ impl Paths {
 }
 
 fn create_synthetic_event(e: Event) -> Event {
-    Reflect::set(&*e, &"__stopPropagation".into(), &JsValue::from_bool(false));
+    Reflect::set(&*e, &"__stopPropagation".into(), &JsValue::from_bool(false)).expect("TODO: panic set __stopPropagation");
 
     let e_cloned = e.clone();
     let origin_stop_propagation = derive_from_js_value(&*e, "stopPropagation");
@@ -33,21 +33,21 @@ fn create_synthetic_event(e: Event) -> Event {
             &*e_cloned,
             &"__stopPropagation".into(),
             &JsValue::from_bool(true),
-        );
+        ).expect("TODO: panic __stopPropagation");
         if origin_stop_propagation.is_function() {
             let origin_stop_propagation = origin_stop_propagation.dyn_ref::<Function>().unwrap();
-            origin_stop_propagation.call0(&JsValue::null());
+            origin_stop_propagation.call0(&JsValue::null()).expect("TODO: panic origin_stop_propagation");
         }
     }) as Box<dyn Fn()>);
     let function = closure.as_ref().unchecked_ref::<Function>().clone();
     closure.forget();
-    Reflect::set(&*e.clone(), &"stopPropagation".into(), &function.into());
+    Reflect::set(&*e.clone(), &"stopPropagation".into(), &function.into()).expect("TODO: panic set stopPropagation");
     e
 }
 
 fn trigger_event_flow(paths: Vec<Function>, se: &Event) {
     for callback in paths {
-        callback.call1(&JsValue::null(), se);
+        callback.call1(&JsValue::null(), se).expect("TODO: panic call callback");
         if derive_from_js_value(se, "__stopPropagation")
             .as_bool()
             .unwrap()
@@ -163,11 +163,11 @@ pub fn update_fiber_props(node: Element, props: &JsValue) -> Element {
                 .has_own_property(&callback_name.into())
             {
                 let callback = derive_from_js_value(props, callback_name);
-                Reflect::set(&element_event_props, &callback_name.into(), &callback);
+                Reflect::set(&element_event_props, &callback_name.into(), &callback).expect("TODO: panic set callback_name");
             }
         }
     }
-    Reflect::set(&node, &ELEMENT_EVENT_PROPS_KEY.into(), &element_event_props);
+    Reflect::set(&node, &ELEMENT_EVENT_PROPS_KEY.into(), &element_event_props).expect("TODO: set ELEMENT_EVENT_PROPS_KEY");
 
     node
 }

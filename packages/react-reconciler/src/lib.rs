@@ -28,6 +28,13 @@ pub trait HostConfig {
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>);
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>);
     fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String);
+
+    fn insert_child_to_container(
+        &self,
+        child: Rc<dyn Any>,
+        container: Rc<dyn Any>,
+        before: Rc<dyn Any>,
+    );
 }
 
 pub struct Reconciler {
@@ -39,7 +46,11 @@ impl Reconciler {
         Reconciler { host_config }
     }
     pub fn create_container(&self, container: Rc<dyn Any>) -> Rc<RefCell<FiberRootNode>> {
-        let host_root_fiber = Rc::new(RefCell::new(FiberNode::new(WorkTag::HostRoot, JsValue::null(), JsValue::null())));
+        let host_root_fiber = Rc::new(RefCell::new(FiberNode::new(
+            WorkTag::HostRoot,
+            JsValue::null(),
+            JsValue::null(),
+        )));
         host_root_fiber.clone().borrow_mut().update_queue = Some(create_update_queue());
         let root = Rc::new(RefCell::new(FiberRootNode::new(
             container.clone(),

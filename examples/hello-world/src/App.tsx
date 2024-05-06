@@ -9,7 +9,7 @@ function App() {
     return (
         <h3
             onClickCapture={(e) => {
-                e.stopPropagation()
+                // e.stopPropagation()
                 console.log('click h3', e.currentTarget)
                 updateNum(prev => prev + 1);
             }}
