@@ -86,7 +86,9 @@ impl HostConfig for ReactDomHostConfig {
         let p = container.clone().downcast::<Node>().unwrap();
         let c = child.clone().downcast::<Node>().unwrap();
         match p.remove_child(&c) {
-            Ok(_) => {}
+            Ok(_) => {
+                log!("remove_child {:?} {:?}", p, c);
+            }
             Err(e) => {
                 log!("Failed to remove_child {:?} {:?} {:?} ", e, p, c);
             }

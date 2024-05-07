@@ -45,11 +45,11 @@ fn delete_child(
         let return_fiber_borrowed = return_fiber.borrow();
         return_fiber_borrowed.deletions.clone()
     };
-    if deletions.is_none() {
-        return_fiber.borrow_mut().deletions = Some(vec![child_to_delete.clone()]);
+    if deletions.is_empty() {
+        return_fiber.borrow_mut().deletions = vec![child_to_delete.clone()];
         return_fiber.borrow_mut().flags |= Flags::ChildDeletion;
     } else {
-        let mut del = return_fiber.borrow_mut().deletions.clone().unwrap();
+        let mut del = &mut return_fiber.borrow_mut().deletions;
         del.push(child_to_delete.clone());
     }
 }

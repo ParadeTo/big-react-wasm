@@ -67,26 +67,28 @@ impl CommitWork {
     }
 
     fn commit_mutation_effects_on_fiber(&self, finished_work: Rc<RefCell<FiberNode>>) {
-        let flags = finished_work.clone().borrow().flags.clone();
+        let flags = finished_work.borrow().flags.clone();
         if flags.contains(Flags::Placement) {
             self.commit_placement(finished_work.clone());
-            finished_work.clone().borrow_mut().flags -= Flags::Placement;
+            finished_work.borrow_mut().flags -= Flags::Placement;
         }
 
         if flags.contains(Flags::ChildDeletion) {
-            let deletions = finished_work.clone().borrow().deletions.clone();
-            if deletions.is_some() {
-                let deletions = deletions.unwrap();
-                for child_to_delete in deletions {
-                    self.commit_deletion(child_to_delete);
+            {
+                let deletions = &finished_work.borrow().deletions;
+                if !deletions.is_empty() {
+                    for child_to_delete in deletions {
+                        self.commit_deletion(child_to_delete.clone());
+                    }
                 }
             }
-            finished_work.clone().borrow_mut().flags -= Flags::ChildDeletion;
+
+            finished_work.borrow_mut().flags -= Flags::ChildDeletion;
         }
 
         if flags.contains(Flags::Update) {
             self.commit_update(finished_work.clone());
-            finished_work.clone().borrow_mut().flags -= Flags::Update;
+            finished_work.borrow_mut().flags -= Flags::Update;
         }
     }
 

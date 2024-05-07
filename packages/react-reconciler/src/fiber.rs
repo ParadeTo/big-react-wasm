@@ -36,7 +36,6 @@ impl MemoizedState {
     }
 }
 
-#[derive(Debug)]
 pub struct FiberNode {
     pub index: u32,
     pub tag: WorkTag,
@@ -53,7 +52,58 @@ pub struct FiberNode {
     pub subtree_flags: Flags,
     pub memoized_props: JsValue,
     pub memoized_state: Option<MemoizedState>,
-    pub deletions: Option<Vec<Rc<RefCell<FiberNode>>>>,
+    pub deletions: Vec<Rc<RefCell<FiberNode>>>,
+}
+
+impl Debug for FiberNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Ok(match self.tag {
+            WorkTag::FunctionComponent => {
+                write!(
+                    f,
+                    "{:?}(flags:{:?}, subtreeFlags:{:?})",
+                    self._type.as_ref(),
+                    self.flags,
+                    self.subtree_flags
+                )
+                    .expect("print error");
+            }
+            WorkTag::HostRoot => {
+                write!(
+                    f,
+                    "{:?}(subtreeFlags:{:?})",
+                    WorkTag::HostRoot,
+                    self.subtree_flags
+                )
+                    .expect("print error");
+            }
+            WorkTag::HostComponent => {
+                write!(
+                    f,
+                    "{:?}(key:{:?}, flags:{:?}, subtreeFlags:{:?})",
+                    self._type,
+                    self.key,
+                    self.flags,
+                    self.subtree_flags
+                )
+                    .expect("print error");
+            }
+            WorkTag::HostText => {
+                write!(
+                    f,
+                    "{:?}(state_node:{:?}, flags:{:?})",
+                    self.tag,
+                    Reflect::get(
+                        self.pending_props.as_ref(),
+                        &JsValue::from_str("content"),
+                    )
+                        .unwrap(),
+                    self.flags
+                )
+                    .expect("print error");
+            }
+        })
+    }
 }
 
 impl FiberNode {
@@ -74,7 +124,7 @@ impl FiberNode {
             memoized_state: None,
             flags: Flags::NoFlags,
             subtree_flags: Flags::NoFlags,
-            deletions: None,
+            deletions: vec![],
         }
     }
 
@@ -147,7 +197,7 @@ impl FiberNode {
                 wip.pending_props = pending_props;
                 wip.flags = Flags::NoFlags;
                 wip.subtree_flags = Flags::NoFlags;
-                wip.deletions = None;
+                wip.deletions = vec![];
                 wip._type = c._type.clone();
 
                 wip.update_queue = c.update_queue.clone();
@@ -213,55 +263,8 @@ impl Debug for FiberRootNode {
             while let Some(QueueItem { node: current, depth }) = queue.pop_front() {
                 let current_ref = current.borrow();
 
-                match current_ref.tag {
-                    WorkTag::FunctionComponent => {
-                        let current_borrowed = current.borrow();
-                        write!(
-                            f,
-                            "{:?}(flags:{:?}, subtreeFlags:{:?})",
-                            current_borrowed._type.as_ref(),
-                            current_borrowed.flags,
-                            current_borrowed.subtree_flags
-                        )
-                            .expect("print error");
-                    }
-                    WorkTag::HostRoot => {
-                        write!(
-                            f,
-                            "{:?}(subtreeFlags:{:?})",
-                            WorkTag::HostRoot,
-                            current_ref.subtree_flags
-                        )
-                            .expect("print error");
-                    }
-                    WorkTag::HostComponent => {
-                        let current_borrowed = current.borrow();
-                        write!(
-                            f,
-                            "{:?}(flags:{:?}, subtreeFlags:{:?})",
-                            current_borrowed._type.as_ref().as_string().unwrap(),
-                            current_borrowed.flags,
-                            current_borrowed.subtree_flags
-                        )
-                            .expect("print error");
-                    }
-                    WorkTag::HostText => {
-                        let current_borrowed = current.borrow();
+                write!(f, "{:?}", current_ref);
 
-                        write!(
-                            f,
-                            "{:?}(state_node:{:?}, flags:{:?})",
-                            current_borrowed.tag,
-                            Reflect::get(
-                                current_borrowed.pending_props.as_ref(),
-                                &JsValue::from_str("content"),
-                            )
-                                .unwrap(),
-                            current_borrowed.flags
-                        )
-                            .expect("print error");
-                    }
-                };
                 if let Some(ref child) = current_ref.child {
                     queue.push_back(QueueItem::new(Rc::clone(child), depth + 1));
                     let mut sibling = child.clone().borrow().sibling.clone();
@@ -278,7 +281,7 @@ impl Debug for FiberRootNode {
                             .expect("print error");
                         continue;
                     }
-                    
+
                     if current_ref._return.is_some() {
                         write!(f, ",").expect("print error");
                     } else {
