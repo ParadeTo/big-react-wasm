@@ -11,8 +11,8 @@ use crate::utils::set_panic_hook;
 
 mod host_config;
 mod renderer;
-mod utils;
 mod synthetic_event;
+mod utils;
 
 #[wasm_bindgen(js_name = createRoot)]
 pub fn create_root(container: &JsValue) -> Renderer {

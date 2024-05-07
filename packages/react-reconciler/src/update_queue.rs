@@ -60,10 +60,12 @@ pub fn process_update_queue(
                 Some(action) => {
                     let f = action.dyn_ref::<Function>();
                     base_state = match f {
-                        None => Some(MemoizedState::JsValue(action.clone())),
+                        None => Some(MemoizedState::MemoizedJsValue(action.clone())),
                         Some(f) => {
-                            if let MemoizedState::JsValue(base_state) = base_state.as_ref().unwrap() {
-                                Some(MemoizedState::JsValue(
+                            if let MemoizedState::MemoizedJsValue(base_state) =
+                                base_state.as_ref().unwrap()
+                            {
+                                Some(MemoizedState::MemoizedJsValue(
                                     f.call1(&JsValue::null(), base_state).unwrap(),
                                 ))
                             } else {

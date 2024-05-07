@@ -8,7 +8,7 @@ use web_sys::{Node, window};
 use react_reconciler::HostConfig;
 use shared::{log, type_of};
 
-use crate::synthetic_event::update_event_props;
+use crate::synthetic_event::update_fiber_props;
 
 pub struct ReactDomHostConfig;
 
@@ -35,9 +35,9 @@ impl HostConfig for ReactDomHostConfig {
     fn create_text_instance(&self, content: &JsValue) -> Rc<dyn Any> {
         let window = window().expect("no global `window` exists");
         let document = window.document().expect("should have a document on window");
-        Rc::new(Node::from(document.create_text_node(
-            to_string(content).as_str()
-        )))
+        Rc::new(Node::from(
+            document.create_text_node(to_string(content).as_str()),
+        ))
     }
 
     fn create_instance(&self, _type: String, props: Rc<dyn Any>) -> Rc<dyn Any> {
@@ -45,13 +45,15 @@ impl HostConfig for ReactDomHostConfig {
         let document = window.document().expect("should have a document on window");
         match document.create_element(_type.as_ref()) {
             Ok(element) => {
-                let element = update_event_props(
+                let element = update_fiber_props(
                     element.clone(),
                     &*props.clone().downcast::<JsValue>().unwrap(),
                 );
                 Rc::new(Node::from(element))
             }
-            Err(_) => todo!(),
+            Err(_) => {
+                panic!("Failed to create_instance {:?}", _type);
+            }
         }
     }
 
@@ -60,9 +62,19 @@ impl HostConfig for ReactDomHostConfig {
         let c = child.clone().downcast::<Node>().unwrap();
         match p.append_child(&c) {
             Ok(_) => {
-                log!("append_initial_child successfully {:?} {:?}", p, c);
+                log!(
+                    "append_initial_child {:?} {:?}",
+                    p,
+                    if c.first_child().is_some() {
+                        c.first_child().clone().unwrap().text_content()
+                    } else {
+                        c.text_content()
+                    }
+                );
             }
-            Err(_) => todo!(),
+            Err(_) => {
+                log!("Failed to append_initial_child {:?} {:?}", p, c);
+            }
         }
     }
 
@@ -75,14 +87,52 @@ impl HostConfig for ReactDomHostConfig {
         let c = child.clone().downcast::<Node>().unwrap();
         match p.remove_child(&c) {
             Ok(_) => {
-                log!("remove_child successfully {:?} {:?}", p, c);
+                log!("remove_child {:?} {:?}", p, c);
             }
-            Err(_) => todo!(),
+            Err(e) => {
+                log!("Failed to remove_child {:?} {:?} {:?} ", e, p, c);
+            }
         }
     }
 
     fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String) {
         let text_instance = text_instance.clone().downcast::<Node>().unwrap();
         text_instance.set_node_value(Some(content.as_str()));
+    }
+
+    fn insert_child_to_container(
+        &self,
+        child: Rc<dyn Any>,
+        container: Rc<dyn Any>,
+        before: Rc<dyn Any>,
+    ) {
+        let parent = container.clone().downcast::<Node>().unwrap();
+        let before = before.clone().downcast::<Node>().unwrap();
+        let child = child.clone().downcast::<Node>().unwrap();
+        match parent.insert_before(&child, Some(&before)) {
+            Ok(_) => {
+                log!(
+                    "insert_child_to_container {:?} {:?} {:?}",
+                    parent,
+                    if before.first_child().is_some() {
+                        before.first_child().clone().unwrap().text_content()
+                    } else {
+                        before.text_content()
+                    },
+                    if child.first_child().is_some() {
+                        child.first_child().clone().unwrap().text_content()
+                    } else {
+                        child.text_content()
+                    }
+                );
+            }
+            Err(_) => {
+                log!(
+                    "Failed to insert_child_to_container {:?} {:?}",
+                    parent,
+                    child
+                );
+            }
+        }
     }
 }

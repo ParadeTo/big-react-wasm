@@ -8,7 +8,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::derive_from_js_value;
+use shared::{derive_from_js_value, log, type_of};
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::Hook;
@@ -22,21 +22,20 @@ pub enum StateNode {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum MemoizedState {
-    JsValue(JsValue),
+pub enum MemoizedState {
+    MemoizedJsValue(JsValue),
     Hook(Rc<RefCell<Hook>>),
 }
 
 impl MemoizedState {
     pub fn js_value(&self) -> Option<JsValue> {
         match self {
-            MemoizedState::JsValue(js_value) => Some(js_value.clone()),
-            MemoizedState::Hook(_) => None
+            MemoizedState::MemoizedJsValue(js_value) => Some(js_value.clone()),
+            MemoizedState::Hook(_) => None,
         }
     }
 }
 
-#[derive(Debug)]
 pub struct FiberNode {
     pub index: u32,
     pub tag: WorkTag,
@@ -53,7 +52,58 @@ pub struct FiberNode {
     pub subtree_flags: Flags,
     pub memoized_props: JsValue,
     pub memoized_state: Option<MemoizedState>,
-    pub deletions: Option<Vec<Rc<RefCell<FiberNode>>>>,
+    pub deletions: Vec<Rc<RefCell<FiberNode>>>,
+}
+
+impl Debug for FiberNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Ok(match self.tag {
+            WorkTag::FunctionComponent => {
+                write!(
+                    f,
+                    "{:?}(flags:{:?}, subtreeFlags:{:?})",
+                    self._type.as_ref(),
+                    self.flags,
+                    self.subtree_flags
+                )
+                    .expect("print error");
+            }
+            WorkTag::HostRoot => {
+                write!(
+                    f,
+                    "{:?}(subtreeFlags:{:?})",
+                    WorkTag::HostRoot,
+                    self.subtree_flags
+                )
+                    .expect("print error");
+            }
+            WorkTag::HostComponent => {
+                write!(
+                    f,
+                    "{:?}(key:{:?}, flags:{:?}, subtreeFlags:{:?})",
+                    self._type,
+                    self.key,
+                    self.flags,
+                    self.subtree_flags
+                )
+                    .expect("print error");
+            }
+            WorkTag::HostText => {
+                write!(
+                    f,
+                    "{:?}(state_node:{:?}, flags:{:?})",
+                    self.tag,
+                    Reflect::get(
+                        self.pending_props.as_ref(),
+                        &JsValue::from_str("content"),
+                    )
+                        .unwrap(),
+                    self.flags
+                )
+                    .expect("print error");
+            }
+        })
+    }
 }
 
 impl FiberNode {
@@ -74,7 +124,7 @@ impl FiberNode {
             memoized_state: None,
             flags: Flags::NoFlags,
             subtree_flags: Flags::NoFlags,
-            deletions: None,
+            deletions: vec![],
         }
     }
 
@@ -86,8 +136,9 @@ impl FiberNode {
         let mut fiber_tag = WorkTag::FunctionComponent;
         if _type.is_string() {
             fiber_tag = WorkTag::HostComponent
+        } else if !type_of(&_type, "function") {
+            log!("Unsupported type {:?}", ele);
         }
-
 
         let mut fiber = FiberNode::new(fiber_tag, props, key);
         fiber._type = _type;
@@ -117,7 +168,7 @@ impl FiberNode {
         };
 
         return if w.is_none() {
-            let mut wip = {
+            let wip = {
                 let c = c_rc.borrow();
                 let mut wip = FiberNode::new(c.tag.clone(), pending_props, c.key.clone());
                 wip._type = c._type.clone();
@@ -146,7 +197,7 @@ impl FiberNode {
                 wip.pending_props = pending_props;
                 wip.flags = Flags::NoFlags;
                 wip.subtree_flags = Flags::NoFlags;
-                wip.deletions = None;
+                wip.deletions = vec![];
                 wip._type = c._type.clone();
 
                 wip.update_queue = c.update_queue.clone();
@@ -188,87 +239,47 @@ impl FiberRootNode {
     }
 }
 
+struct QueueItem {
+    depth: u32,
+    node: Rc<RefCell<FiberNode>>,
+}
+
+impl QueueItem {
+    fn new(node: Rc<RefCell<FiberNode>>, depth: u32) -> Self {
+        Self {
+            node,
+            depth,
+        }
+    }
+}
+
 impl Debug for FiberRootNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let root = self.current.clone().borrow().alternate.clone();
         Ok(if let Some(node) = root {
             let mut queue = VecDeque::new();
-            queue.push_back(Rc::clone(&node));
+            queue.push_back(QueueItem::new(Rc::clone(&node), 0));
 
-            while let Some(current) = queue.pop_front() {
+            while let Some(QueueItem { node: current, depth }) = queue.pop_front() {
                 let current_ref = current.borrow();
 
-                match current_ref.tag {
-                    WorkTag::FunctionComponent => {
-                        let current_borrowed = current.borrow();
-                        write!(
-                            f,
-                            "{:?}(flags:{:?}, subtreeFlags:{:?})",
-                            current_borrowed._type.as_ref(),
-                            current_borrowed.flags,
-                            current_borrowed.subtree_flags
-                        )
-                            .expect("print error");
-                    }
-                    WorkTag::HostRoot => {
-                        write!(
-                            f,
-                            "{:?}(subtreeFlags:{:?})",
-                            WorkTag::HostRoot,
-                            current_ref.subtree_flags
-                        )
-                            .expect("print error");
-                    }
-                    WorkTag::HostComponent => {
-                        let current_borrowed = current.borrow();
-                        write!(
-                            f,
-                            "{:?}(flags:{:?}, subtreeFlags:{:?})",
-                            current_borrowed
-                                ._type
-                                .as_ref().as_string().unwrap(),
-                            current_borrowed.flags,
-                            current_borrowed.subtree_flags
-                        )
-                            .expect("print error");
-                    }
-                    WorkTag::HostText => {
-                        let current_borrowed = current.borrow();
+                write!(f, "{:?}", current_ref);
 
-                        write!(
-                            f,
-                            "{:?}(state_node:{:?}, flags:{:?})",
-                            current_borrowed.tag,
-                            Reflect::get(
-                                current_borrowed.pending_props.as_ref(),
-                                &JsValue::from_str("content"),
-                            )
-                                .unwrap(),
-                            current_borrowed.flags
-                        )
-                            .expect("print error");
-                    }
-                };
                 if let Some(ref child) = current_ref.child {
-                    queue.push_back(Rc::clone(child));
+                    queue.push_back(QueueItem::new(Rc::clone(child), depth + 1));
                     let mut sibling = child.clone().borrow().sibling.clone();
                     while sibling.is_some() {
-                        queue.push_back(Rc::clone(sibling.as_ref().unwrap()));
+                        queue.push_back(QueueItem::new(Rc::clone(sibling.as_ref().unwrap()), depth + 1));
                         sibling = sibling.as_ref().unwrap().clone().borrow().sibling.clone();
                     }
                 }
 
-                if let Some(next) = queue.front() {
-                    let next_ref = next.borrow();
-                    if let (Some(current_parent), Some(next_parent)) =
-                        (current_ref._return.as_ref(), next_ref._return.as_ref())
-                    {
-                        if !Rc::ptr_eq(current_parent, next_parent) {
-                            writeln!(f, "").expect("print error");
-                            writeln!(f, "------------------------------------")
-                                .expect("print error");
-                            continue;
-                        }
+                if let Some(QueueItem { node: next, depth: next_depth }) = queue.front() {
+                    if *next_depth != depth {
+                        writeln!(f, "").expect("print error");
+                        writeln!(f, "------------------------------------")
+                            .expect("print error");
+                        continue;
                     }
 
                     if current_ref._return.is_some() {

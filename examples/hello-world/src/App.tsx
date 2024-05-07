@@ -1,26 +1,33 @@
 import {useState} from 'react'
 
-
 function App() {
     const [num, updateNum] = useState(0);
 
-    const isOdd = num % 2;
+    const isOdd = num % 2 === 1;
 
+    const before = [
+        <li key={1}>1</li>,
+        <li>2</li>,
+        <li>3</li>,
+        <li key={4}>4</li>
+    ];
+    const after = [
+        // <li key={4}>4</li>,
+        <li>2</li>,
+        <li>3</li>,
+        <li key={1}>1</li>
+    ];
+
+    const listToUse = isOdd ? after : before;
+    console.log(num, listToUse)
     return (
-        <h3
-            onClickCapture={(e) => {
-                e.stopPropagation()
-                console.log('click h3', e.currentTarget)
-                updateNum(prev => prev + 1);
+        <ul
+            onClick={(e) => {
+                updateNum(num => num + 1);
             }}
         >
-            <div onClick={(e) => {
-                console.log('click div', e.currentTarget)
-            }}>
-                {isOdd ? <div>odd</div> : <p>even</p>}
-            </div>
-
-        </h3>
+            {listToUse}
+        </ul>
     );
 }
 

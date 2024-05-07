@@ -166,9 +166,7 @@ impl WorkLoop {
 
     fn perform_unit_of_work(&self, fiber: Rc<RefCell<FiberNode>>) -> Result<(), JsValue> {
         let next = begin_work(fiber.clone())?;
-        let pending_props = {
-            fiber.clone().borrow().pending_props.clone()
-        };
+        let pending_props = { fiber.clone().borrow().pending_props.clone() };
         fiber.clone().borrow_mut().memoized_props = pending_props;
         if next.is_none() {
             self.complete_unit_of_work(fiber.clone());
@@ -199,7 +197,7 @@ impl WorkLoop {
             if sibling.is_some() {
                 // self.work_in_progress = next.clone();
                 unsafe {
-                    WORK_IN_PROGRESS = next.clone();
+                    WORK_IN_PROGRESS = sibling.clone();
                 }
                 return;
             }
@@ -207,7 +205,7 @@ impl WorkLoop {
             let _return = node.clone().unwrap().clone().borrow()._return.clone();
 
             if _return.is_none() {
-                node = None;
+                // node = None;
                 // self.work_in_progress = None;
                 unsafe {
                     WORK_IN_PROGRESS = None;

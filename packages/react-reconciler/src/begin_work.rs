@@ -52,7 +52,7 @@ fn update_host_root(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCe
         panic!("update_host_root next_children is none")
     }
 
-    if let MemoizedState::JsValue(next_children) = next_children.unwrap() {
+    if let MemoizedState::MemoizedJsValue(next_children) = next_children.unwrap() {
         reconcile_children(work_in_progress.clone(), Some(next_children));
     }
     work_in_progress.clone().borrow().child.clone()

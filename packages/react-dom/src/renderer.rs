@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsValue;
 
 use react_reconciler::fiber::FiberRootNode;
 use react_reconciler::Reconciler;
@@ -17,8 +17,16 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(root: Rc<RefCell<FiberRootNode>>, reconciler: Reconciler, container: &JsValue) -> Self {
-        Self { root, reconciler, container: container.clone() }
+    pub fn new(
+        root: Rc<RefCell<FiberRootNode>>,
+        reconciler: Reconciler,
+        container: &JsValue,
+    ) -> Self {
+        Self {
+            root,
+            reconciler,
+            container: container.clone(),
+        }
     }
 }
 
