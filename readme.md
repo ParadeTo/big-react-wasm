@@ -27,3 +27,5 @@
 [从零实现 React v18，但 WASM 版 - [9] 使用 Jest 进行单元测试](https://www.paradeto.com/2024/04/23/big-react-wasm-9/)
 
 [从零实现 React v18，但 WASM 版 - [10] 实现单节点更新流程](https://www.paradeto.com/2024/04/26/big-react-wasm-10/)
+
+[从零实现 React v18，但 WASM 版 - [11] 实现事件系统](https://www.paradeto.com/2024/04/30/big-react-wasm-11/)
