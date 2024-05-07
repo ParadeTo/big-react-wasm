@@ -107,7 +107,7 @@ impl HostConfig for ReactDomHostConfig {
         let parent = container.clone().downcast::<Node>().unwrap();
         let before = before.clone().downcast::<Node>().unwrap();
         let child = child.clone().downcast::<Node>().unwrap();
-        match parent.insert_before(&before, Some(&child)) {
+        match parent.insert_before(&child, Some(&before)) {
             Ok(_) => {
                 log!(
                     "insert_child_to_container {:?} {:?} {:?}",
