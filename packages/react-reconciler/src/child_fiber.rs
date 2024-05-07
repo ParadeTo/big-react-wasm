@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
@@ -174,39 +175,51 @@ fn reconcile_single_text_node(
     Rc::new(RefCell::new(created))
 }
 
+struct Key(JsValue);
+
+impl PartialEq for Key {
+    fn eq(&self, other: &Self) -> bool {
+        Object::is(&self.0, &other.0)
+    }
+}
+
+impl Eq for Key {}
+
+impl Hash for Key {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        if self.0.is_string() {
+            self.0.as_string().unwrap().hash(state)
+        } else if let Some(n) = self.0.as_f64() {
+            n.to_bits().hash(state)
+        } else if self.0.is_null() {
+            "null".hash(state)
+        }
+    }
+}
+
 fn update_from_map(
     return_fiber: Rc<RefCell<FiberNode>>,
-    mut existing_children: HashMap<String, Rc<RefCell<FiberNode>>>,
+    existing_children: &mut HashMap<Key, Rc<RefCell<FiberNode>>>,
     index: u32,
     element: &JsValue,
     should_track_effects: bool,
 ) -> Rc<RefCell<FiberNode>> {
     let key_to_use;
     if type_of(element, "string") {
-        key_to_use = index.to_string();
+        key_to_use = JsValue::from(index);
     } else {
         let key = derive_from_js_value(element, "key");
         key_to_use = match key.is_null() {
-            true => index.to_string(),
-            false => match key.as_string() {
-                None => {
-                    log!(
-                        "update_from_map, key is not string {:?}",
-                        derive_from_js_value(element, "key")
-                    );
-                    "".to_string()
-                }
-                Some(k) => k,
-            },
+            true => JsValue::from(index),
+            false => key.clone(),
         }
     }
-
-    let before = existing_children.get(&key_to_use).clone();
+    let before = existing_children.get(&Key(key_to_use.clone())).clone();
     if type_of(element, "string") {
         let props = create_props_with_content(element.clone());
         if before.is_some() {
             let before = (*before.clone().unwrap()).clone();
-            existing_children.remove(&key_to_use);
+            existing_children.remove(&Key(key_to_use.clone()));
             if before.borrow().tag == HostText {
                 return use_fiber(before.clone(), props.clone());
             } else {
@@ -225,7 +238,7 @@ fn update_from_map(
 
         if before.is_some() {
             let before = (*before.clone().unwrap()).clone();
-            existing_children.remove(&key_to_use);
+            existing_children.remove(&Key(key_to_use.clone()));
             if Object::is(
                 &before.borrow()._type,
                 &derive_from_js_value(&(*element).clone(), "type"),
@@ -254,19 +267,15 @@ fn reconcile_children_array(
     // 创建的第一个fiber
     let mut first_new_fiber: Option<Rc<RefCell<FiberNode>>> = None;
 
-    let mut existing_children: HashMap<String, Rc<RefCell<FiberNode>>> = HashMap::new();
+    let mut existing_children: HashMap<Key, Rc<RefCell<FiberNode>>> = HashMap::new();
     let mut current = current_first_child;
     while current.is_some() {
         let current_rc = current.unwrap();
         let key_to_use = match current_rc.clone().borrow().key.is_null() {
-            true => current_rc.borrow().index.to_string(),
-            false => current_rc
-                .borrow()
-                .key
-                .as_string()
-                .expect("key is not string"),
+            true => JsValue::from(current_rc.borrow().index),
+            false => current_rc.borrow().key.clone(),
         };
-        existing_children.insert(key_to_use, current_rc.clone());
+        existing_children.insert(Key(key_to_use), current_rc.clone());
         current = current_rc.borrow().sibling.clone();
     }
 
@@ -275,7 +284,7 @@ fn reconcile_children_array(
         let after = new_child.get(i);
         let new_fiber = update_from_map(
             return_fiber.clone(),
-            existing_children.clone(),
+            &mut existing_children,
             i,
             &after,
             should_track_effects,

@@ -177,9 +177,7 @@ impl CommitWork {
             }
 
             let node_cloned = node.clone();
-            let _return = {
-                node_cloned.borrow()._return.clone()
-            };
+            let _return = { node_cloned.borrow()._return.clone() };
             node_cloned
                 .borrow_mut()
                 .sibling
@@ -198,12 +196,13 @@ impl CommitWork {
             return;
         }
         let parent_state_node = FiberNode::derive_state_node(host_parent.unwrap());
-        // let sibling = self.get_host_sibling(finished_work.clone());
+        let sibling = self.get_host_sibling(finished_work.clone());
+
         if parent_state_node.is_some() {
             self.insert_or_append_placement_node_into_container(
                 finished_work.clone(),
                 parent_state_node.unwrap(),
-                None,
+                sibling,
             );
         }
     }
@@ -293,12 +292,9 @@ impl CommitWork {
                 node = parent.clone();
             }
 
-
-            let _return = {
-                node_rc.borrow()._return.clone()
-            };
-            node.clone()
-                .unwrap()
+            let node_rc = node.clone().unwrap();
+            let _return = { node_rc.borrow()._return.clone() };
+            node_rc
                 .borrow_mut()
                 .sibling
                 .clone()
@@ -326,8 +322,7 @@ impl CommitWork {
                     node = node_rc.borrow().child.clone();
                 }
             }
-
-            if node
+            if !node
                 .clone()
                 .unwrap()
                 .borrow()

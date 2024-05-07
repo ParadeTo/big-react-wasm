@@ -3,7 +3,7 @@ import {useState} from 'react'
 function App() {
     const [num, updateNum] = useState(0);
 
-    const isOdd = num % 2;
+    const isOdd = num % 2 === 1;
 
     const before = [
         <li key={1}>1</li>,
@@ -18,12 +18,12 @@ function App() {
         <li key={1}>1</li>
     ];
 
-    const listToUse = isOdd ? before : after;
-
+    const listToUse = isOdd ? after : before;
+    console.log(num, listToUse)
     return (
         <ul
             onClick={(e) => {
-                updateNum(num + 1);
+                updateNum(num => num + 1);
             }}
         >
             {listToUse}

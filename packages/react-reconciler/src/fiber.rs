@@ -189,14 +189,28 @@ impl FiberRootNode {
     }
 }
 
+struct QueueItem {
+    depth: u32,
+    node: Rc<RefCell<FiberNode>>,
+}
+
+impl QueueItem {
+    fn new(node: Rc<RefCell<FiberNode>>, depth: u32) -> Self {
+        Self {
+            node,
+            depth,
+        }
+    }
+}
+
 impl Debug for FiberRootNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let root = self.current.clone().borrow().alternate.clone();
         Ok(if let Some(node) = root {
             let mut queue = VecDeque::new();
-            queue.push_back(Rc::clone(&node));
+            queue.push_back(QueueItem::new(Rc::clone(&node), 0));
 
-            while let Some(current) = queue.pop_front() {
+            while let Some(QueueItem { node: current, depth }) = queue.pop_front() {
                 let current_ref = current.borrow();
 
                 match current_ref.tag {
@@ -249,27 +263,22 @@ impl Debug for FiberRootNode {
                     }
                 };
                 if let Some(ref child) = current_ref.child {
-                    queue.push_back(Rc::clone(child));
+                    queue.push_back(QueueItem::new(Rc::clone(child), depth + 1));
                     let mut sibling = child.clone().borrow().sibling.clone();
                     while sibling.is_some() {
-                        queue.push_back(Rc::clone(sibling.as_ref().unwrap()));
+                        queue.push_back(QueueItem::new(Rc::clone(sibling.as_ref().unwrap()), depth + 1));
                         sibling = sibling.as_ref().unwrap().clone().borrow().sibling.clone();
                     }
                 }
 
-                if let Some(next) = queue.front() {
-                    let next_ref = next.borrow();
-                    if let (Some(current_parent), Some(next_parent)) =
-                        (current_ref._return.as_ref(), next_ref._return.as_ref())
-                    {
-                        if !Rc::ptr_eq(current_parent, next_parent) {
-                            writeln!(f, "").expect("print error");
-                            writeln!(f, "------------------------------------")
-                                .expect("print error");
-                            continue;
-                        }
+                if let Some(QueueItem { node: next, depth: next_depth }) = queue.front() {
+                    if *next_depth != depth {
+                        writeln!(f, "").expect("print error");
+                        writeln!(f, "------------------------------------")
+                            .expect("print error");
+                        continue;
                     }
-
+                    
                     if current_ref._return.is_some() {
                         write!(f, ",").expect("print error");
                     } else {
