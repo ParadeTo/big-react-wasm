@@ -28,17 +28,17 @@ pub trait HostConfig {
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>);
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>);
     fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String);
-
     fn insert_child_to_container(
         &self,
         child: Rc<dyn Any>,
         container: Rc<dyn Any>,
         before: Rc<dyn Any>,
     );
+    fn schedule_microtask(&self, callback: Box<dyn FnMut()>);
 }
 
 pub struct Reconciler {
-    host_config: Rc<dyn HostConfig>,
+    pub host_config: Rc<dyn HostConfig>,
 }
 
 impl Reconciler {

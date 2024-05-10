@@ -1,8 +1,11 @@
 use std::any::Any;
+use std::cell::RefCell;
 use std::rc::Rc;
 
+use js_sys::{Function, global, Promise};
 use js_sys::JSON::stringify;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::*;
 use web_sys::{Node, window};
 
 use react_reconciler::HostConfig;
@@ -29,6 +32,20 @@ pub fn to_string(js_value: &JsValue) -> String {
             js_string.into()
         }
     })
+}
+
+#[wasm_bindgen]
+extern "C" {
+    type Global;
+
+    #[wasm_bindgen]
+    fn queueMicrotask(closure: &JsValue);
+
+    #[wasm_bindgen]
+    fn setTimeout(closure: &JsValue, timeout: i32);
+
+    #[wasm_bindgen(method, getter, js_name = queueMicrotask)]
+    fn hasQueueMicrotask(this: &Global) -> JsValue;
 }
 
 impl HostConfig for ReactDomHostConfig {
@@ -134,5 +151,43 @@ impl HostConfig for ReactDomHostConfig {
                 );
             }
         }
+    }
+
+    fn schedule_microtask(&self, callback: Box<dyn FnMut()>) {
+        let closure = Rc::new(RefCell::new(Some(Closure::wrap(callback))));
+
+        if global()
+            .unchecked_into::<Global>()
+            .hasQueueMicrotask()
+            .is_function()
+        {
+            let closure_clone = closure.clone();
+            queueMicrotask(&closure_clone.borrow_mut().as_ref().unwrap().as_ref().unchecked_ref::<JsValue>());
+            closure_clone.borrow_mut().take().unwrap_throw().forget();
+        } else if js_sys::Reflect::get(&*global(), &JsValue::from_str("Promise"))
+            .map(|value| value.is_function())
+            .unwrap_or(false)
+        {
+            let promise = Promise::resolve(&JsValue::NULL);
+            let closure_clone = closure.clone();
+
+            let c = Closure::wrap(Box::new(move |v| {           // Access the underlying JsValue and cast it to a Function
+                // Access the underlying JsValue and cast it to a Function
+                let b = closure_clone.borrow_mut();
+                let function = b.as_ref().unwrap().as_ref().unchecked_ref::<Function>();
+                // Call the function with no arguments
+                let _ = function.call0(&JsValue::NULL);
+            }) as Box<dyn FnMut(JsValue)>);
+            let _ = promise.then(&c);
+            c.forget();
+        } else {
+            let closure_clone = closure.clone();
+            setTimeout(&closure_clone.borrow_mut().as_ref().unwrap().as_ref().unchecked_ref::<JsValue>(), 0);
+            closure_clone.borrow_mut().take().unwrap_throw().forget();
+        }
+
+        // if let Some(closure) = closure.borrow_mut().take() {
+        //     closure.forget();
+        // }
     }
 }
