@@ -170,12 +170,9 @@ impl HostConfig for ReactDomHostConfig {
         {
             let promise = Promise::resolve(&JsValue::NULL);
             let closure_clone = closure.clone();
-
-            let c = Closure::wrap(Box::new(move |v| {           // Access the underlying JsValue and cast it to a Function
-                // Access the underlying JsValue and cast it to a Function
+            let c = Closure::wrap(Box::new(move |_v| {
                 let b = closure_clone.borrow_mut();
                 let function = b.as_ref().unwrap().as_ref().unchecked_ref::<Function>();
-                // Call the function with no arguments
                 let _ = function.call0(&JsValue::NULL);
             }) as Box<dyn FnMut(JsValue)>);
             let _ = promise.then(&c);
@@ -185,9 +182,5 @@ impl HostConfig for ReactDomHostConfig {
             setTimeout(&closure_clone.borrow_mut().as_ref().unwrap().as_ref().unchecked_ref::<JsValue>(), 0);
             closure_clone.borrow_mut().take().unwrap_throw().forget();
         }
-
-        // if let Some(closure) = closure.borrow_mut().take() {
-        //     closure.forget();
-        // }
     }
 }

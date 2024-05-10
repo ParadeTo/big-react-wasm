@@ -8,10 +8,11 @@ use web_sys::js_sys::{Function, Object, Reflect};
 use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
+use crate::fiber_lanes::{Lane, request_update_lane};
 use crate::update_queue::{
     create_update, create_update_queue, enqueue_update, process_update_queue, UpdateQueue,
 };
-use crate::work_loop::WorkLoop;
+use crate::WORK_LOOP;
 
 #[wasm_bindgen]
 extern "C" {
@@ -21,7 +22,7 @@ extern "C" {
 static mut CURRENTLY_RENDERING_FIBER: Option<Rc<RefCell<FiberNode>>> = None;
 static mut WORK_IN_PROGRESS_HOOK: Option<Rc<RefCell<Hook>>> = None;
 static mut CURRENT_HOOK: Option<Rc<RefCell<Hook>>> = None;
-pub static mut WORK_LOOP: Option<Rc<RefCell<WorkLoop>>> = None;
+static mut RENDER_LANE: Lane = Lane::NoLane;
 
 #[derive(Debug, Clone)]
 pub struct Hook {
@@ -56,9 +57,10 @@ fn update_hooks_to_dispatcher(is_update: bool) {
     updateDispatcher(&object.into());
 }
 
-pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsValue, JsValue> {
+pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>, lane: Lane) -> Result<JsValue, JsValue> {
     unsafe {
         CURRENTLY_RENDERING_FIBER = Some(work_in_progress.clone());
+        RENDER_LANE = lane;
     }
 
     let work_in_progress_cloned = work_in_progress.clone();
@@ -89,6 +91,7 @@ pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<JsV
         CURRENTLY_RENDERING_FIBER = None;
         WORK_IN_PROGRESS_HOOK = None;
         CURRENT_HOOK = None;
+        RENDER_LANE = Lane::NoLane;
     }
 
     children
@@ -257,6 +260,7 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
             base_state,
             queue.clone(),
             CURRENTLY_RENDERING_FIBER.clone().unwrap(),
+            RENDER_LANE.clone(),
         );
     }
     log!("memoized_state {:?}", hook_cloned.borrow().memoized_state);
@@ -281,14 +285,10 @@ fn dispatch_set_state(
     update_queue: Rc<RefCell<UpdateQueue>>,
     action: &JsValue,
 ) {
-    let update = create_update(action.clone());
+    let lane = request_update_lane();
+    let update = create_update(action.clone(), lane.clone());
     enqueue_update(update_queue.clone(), update);
     unsafe {
-        WORK_LOOP
-            .as_ref()
-            .unwrap()
-            .clone()
-            .borrow()
-            .schedule_update_on_fiber(fiber.clone());
+        WORK_LOOP.schedule_update_on_fiber(fiber.clone(), lane);
     }
 }

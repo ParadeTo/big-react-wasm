@@ -12,6 +12,7 @@ use shared::{derive_from_js_value, log, type_of};
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::Hook;
+use crate::fiber_lanes::{Lane, merge_lanes};
 use crate::update_queue::{Update, UpdateQueue};
 use crate::work_tags::WorkTag;
 
@@ -37,6 +38,7 @@ impl MemoizedState {
 }
 
 pub struct FiberNode {
+    pub lanes: Lane,
     pub index: u32,
     pub tag: WorkTag,
     pub pending_props: JsValue,
@@ -125,6 +127,7 @@ impl FiberNode {
             flags: Flags::NoFlags,
             subtree_flags: Flags::NoFlags,
             deletions: vec![],
+            lanes: Lane::NoLane,
         }
     }
 
@@ -154,7 +157,7 @@ impl FiberNode {
         };
 
         let mut u = update_queue.borrow_mut();
-        u.shared.pending = Some(update);
+        u.shared.pending = Some(Rc::new(RefCell::new(update)));
     }
 
     pub fn create_work_in_progress(
@@ -227,6 +230,8 @@ pub struct FiberRootNode {
     pub container: Rc<dyn Any>,
     pub current: Rc<RefCell<FiberNode>>,
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
+    pub pending_lanes: Lane,
+    pub finished_lane: Lane,
 }
 
 impl FiberRootNode {
@@ -235,7 +240,17 @@ impl FiberRootNode {
             container,
             current: host_root_fiber,
             finished_work: None,
+            pending_lanes: Lane::NoLane,
+            finished_lane: Lane::NoLane,
         }
+    }
+
+    pub fn mark_root_finished(&mut self, lane: Lane) {
+        self.pending_lanes &= !lane;
+    }
+
+    pub fn mark_root_updated(&mut self, lane: Lane) {
+        self.pending_lanes = merge_lanes(self.pending_lanes.clone(), lane)
     }
 }
 
@@ -263,7 +278,7 @@ impl Debug for FiberRootNode {
             while let Some(QueueItem { node: current, depth }) = queue.pop_front() {
                 let current_ref = current.borrow();
 
-                write!(f, "{:?}", current_ref);
+                write!(f, "{:?}", current_ref).expect("TODO: panic print FiberNode");
 
                 if let Some(ref child) = current_ref.child {
                     queue.push_back(QueueItem::new(Rc::clone(child), depth + 1));
