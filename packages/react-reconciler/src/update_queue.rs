@@ -38,8 +38,18 @@ pub fn create_update(action: JsValue, lane: Lane) -> Update {
     }
 }
 
-pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, update: Update) {
-    update_queue.borrow_mut().shared.pending = Option::from(Rc::new(RefCell::new(update)));
+pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, mut update: Update) {
+    let pending = update_queue.borrow().shared.pending.clone();
+    let update_rc = Rc::new(RefCell::new(update));
+    let update_option = Option::from(update_rc.clone());
+    if pending.is_none() {
+        update_rc.borrow_mut().next = update_option.clone();
+    } else {
+        let pending = pending.clone().unwrap();
+        update_rc.borrow_mut().next = { pending.borrow().next.clone() };
+        pending.borrow_mut().next = update_option.clone();
+    }
+    update_queue.borrow_mut().shared.pending = update_option.clone();
 }
 
 pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
@@ -60,7 +70,6 @@ pub fn process_update_queue(
         let pending = update_queue.borrow().shared.pending.clone();
         update_queue.borrow_mut().shared.pending = None;
         if pending.is_some() {
-            // let action = pending.unwrap().action;
             let pending_update = pending.clone().unwrap();
             let mut update = pending_update.clone();
             loop {

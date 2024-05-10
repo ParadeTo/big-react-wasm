@@ -12,7 +12,7 @@ use crate::fiber_lanes::{Lane, request_update_lane};
 use crate::update_queue::{
     create_update, create_update_queue, enqueue_update, process_update_queue, UpdateQueue,
 };
-use crate::WORK_LOOP;
+use crate::work_loop::schedule_update_on_fiber;
 
 #[wasm_bindgen]
 extern "C" {
@@ -289,6 +289,6 @@ fn dispatch_set_state(
     let update = create_update(action.clone(), lane.clone());
     enqueue_update(update_queue.clone(), update);
     unsafe {
-        WORK_LOOP.schedule_update_on_fiber(fiber.clone(), lane);
+        schedule_update_on_fiber(fiber.clone(), lane);
     }
 }

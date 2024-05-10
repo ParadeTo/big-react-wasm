@@ -13,6 +13,7 @@ pub fn flush_sync_callbacks() {
                 callback();
             }
             SYNC_QUEUE = vec![];
+            IS_FLUSHING_SYNC_QUEUE = false;
         }
     }
 }

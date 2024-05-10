@@ -17,6 +17,12 @@ function FunctionComponent(props) {
     return <div>{props.name}</div>;
 }
 
+function sleep(ms) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms)
+    })
+}
+
 describe('ReactFunctionComponent', () => {
     beforeEach(() => {
         jest.resetModules();
@@ -25,10 +31,11 @@ describe('ReactFunctionComponent', () => {
         ReactTestUtils = require('../utils/test-utils')
     });
 
-    it('should render stateless component', () => {
+    it('should render stateless component', async () => {
         const el = document.createElement('div');
         // console.log(FunctionComponent.toString())
         ReactDOM.createRoot(el).render(<FunctionComponent name="A"/>);
+        await sleep(10)
         expect(el.textContent).toBe('A');
     });
 

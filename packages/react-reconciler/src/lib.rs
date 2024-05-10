@@ -4,11 +4,12 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 
+use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 // use crate::fiber_hooks::{WORK_LOOP as Fiber_HOOKS};
 use crate::fiber_lanes::Lane;
 use crate::update_queue::{create_update, create_update_queue, enqueue_update};
-use crate::work_loop::WorkLoop;
+use crate::work_loop::schedule_update_on_fiber;
 use crate::work_tags::WorkTag;
 
 mod begin_work;
@@ -24,7 +25,8 @@ mod work_tags;
 mod fiber_lanes;
 mod sync_task_queue;
 
-pub static mut WORK_LOOP: WorkLoop = WorkLoop { complete_work: None, host_config: None };
+pub static mut HOST_CONFIG: Option<Rc<dyn HostConfig>> = None;
+static mut COMPLETE_WORK: Option<CompleteWork> = None;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: &JsValue) -> Rc<dyn Any>;
@@ -75,8 +77,9 @@ impl Reconciler {
             update,
         );
         unsafe {
-            WORK_LOOP = WorkLoop::new(self.host_config.clone());
-            WORK_LOOP.schedule_update_on_fiber(host_root_fiber, root_render_priority);
+            HOST_CONFIG = Some(self.host_config.clone());
+            COMPLETE_WORK = Some(CompleteWork::new(self.host_config.clone()));
+            schedule_update_on_fiber(host_root_fiber, root_render_priority);
         }
         element.clone()
     }
