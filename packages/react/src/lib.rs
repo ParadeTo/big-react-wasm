@@ -115,3 +115,9 @@ pub unsafe fn use_state(initial_state: &JsValue) -> Result<JsValue, JsValue> {
     let use_state = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_state;
     use_state.call1(&JsValue::null(), initial_state)
 }
+
+#[wasm_bindgen(js_name = useEffect)]
+pub unsafe fn use_effect(create: &JsValue, deps: &JsValue) {
+    let use_effect = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_effect;
+    use_effect.call2(&JsValue::null(), create, deps);
+}

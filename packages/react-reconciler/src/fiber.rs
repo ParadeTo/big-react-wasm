@@ -11,7 +11,7 @@ use web_sys::js_sys::Reflect;
 use shared::{derive_from_js_value, log, type_of};
 
 use crate::fiber_flags::Flags;
-use crate::fiber_hooks::Hook;
+use crate::fiber_hooks::{Effect, Hook};
 use crate::fiber_lanes::{Lane, merge_lanes};
 use crate::update_queue::{Update, UpdateQueue};
 use crate::work_tags::WorkTag;
@@ -26,13 +26,14 @@ pub enum StateNode {
 pub enum MemoizedState {
     MemoizedJsValue(JsValue),
     Hook(Rc<RefCell<Hook>>),
+    Effect(Rc<RefCell<Effect>>),
 }
 
 impl MemoizedState {
     pub fn js_value(&self) -> Option<JsValue> {
         match self {
             MemoizedState::MemoizedJsValue(js_value) => Some(js_value.clone()),
-            MemoizedState::Hook(_) => None,
+            _ => None
         }
     }
 }
