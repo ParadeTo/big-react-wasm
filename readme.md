@@ -29,3 +29,7 @@
 [从零实现 React v18，但 WASM 版 - [10] 实现单节点更新流程](https://www.paradeto.com/2024/04/26/big-react-wasm-10/)
 
 [从零实现 React v18，但 WASM 版 - [11] 实现事件系统](https://www.paradeto.com/2024/04/30/big-react-wasm-11/)
+
+[从零实现 React v18，但 WASM 版 - [12] 实现多节点更新流程](https://www.paradeto.com/2024/05/07/big-react-wasm-12/)
+
+[从零实现 React v18，但 WASM 版 - [13] 引入 Lane 模型，实现 Batch Update](https://www.paradeto.com/2024/05/11/big-react-wasm-13/)
