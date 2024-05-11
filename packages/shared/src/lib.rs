@@ -21,7 +21,8 @@ pub fn derive_from_js_value(js_value: &JsValue, str: &str) -> JsValue {
 }
 
 pub fn is_dev() -> bool {
-    env!("ENV") == "dev"
+    // env!("ENV") == "dev"
+    true
 }
 
 pub fn type_of(val: &JsValue, _type: &str) -> bool {

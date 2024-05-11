@@ -4,10 +4,12 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 
+use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
-use crate::fiber_hooks::WORK_LOOP;
+// use crate::fiber_hooks::{WORK_LOOP as Fiber_HOOKS};
+use crate::fiber_lanes::Lane;
 use crate::update_queue::{create_update, create_update_queue, enqueue_update};
-use crate::work_loop::WorkLoop;
+use crate::work_loop::schedule_update_on_fiber;
 use crate::work_tags::WorkTag;
 
 mod begin_work;
@@ -20,6 +22,11 @@ mod fiber_hooks;
 mod update_queue;
 mod work_loop;
 mod work_tags;
+mod fiber_lanes;
+mod sync_task_queue;
+
+pub static mut HOST_CONFIG: Option<Rc<dyn HostConfig>> = None;
+static mut COMPLETE_WORK: Option<CompleteWork> = None;
 
 pub trait HostConfig {
     fn create_text_instance(&self, content: &JsValue) -> Rc<dyn Any>;
@@ -28,17 +35,17 @@ pub trait HostConfig {
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>);
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>);
     fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String);
-
     fn insert_child_to_container(
         &self,
         child: Rc<dyn Any>,
         container: Rc<dyn Any>,
         before: Rc<dyn Any>,
     );
+    fn schedule_microtask(&self, callback: Box<dyn FnMut()>);
 }
 
 pub struct Reconciler {
-    host_config: Rc<dyn HostConfig>,
+    pub host_config: Rc<dyn HostConfig>,
 }
 
 impl Reconciler {
@@ -63,19 +70,17 @@ impl Reconciler {
 
     pub fn update_container(&self, element: JsValue, root: Rc<RefCell<FiberRootNode>>) -> JsValue {
         let host_root_fiber = Rc::clone(&root).borrow().current.clone();
-        let update = create_update(element.clone());
+        let root_render_priority = Lane::SyncLane;
+        let update = create_update(element.clone(), root_render_priority.clone());
         enqueue_update(
             host_root_fiber.borrow().update_queue.clone().unwrap(),
             update,
         );
-        let work_loop = Rc::new(RefCell::new(WorkLoop::new(self.host_config.clone())));
         unsafe {
-            WORK_LOOP = Some(work_loop.clone());
+            HOST_CONFIG = Some(self.host_config.clone());
+            COMPLETE_WORK = Some(CompleteWork::new(self.host_config.clone()));
+            schedule_update_on_fiber(host_root_fiber, root_render_priority);
         }
-        work_loop
-            .clone()
-            .borrow()
-            .schedule_update_on_fiber(host_root_fiber);
         element.clone()
     }
 }
