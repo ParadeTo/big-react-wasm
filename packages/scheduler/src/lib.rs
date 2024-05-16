@@ -3,7 +3,9 @@ use std::cmp::PartialEq;
 
 use wasm_bindgen::prelude::*;
 use web_sys::{MessageChannel, MessagePort};
-use web_sys::js_sys::{Function, global, Reflect};
+use web_sys::js_sys::{Function, global};
+
+use shared::log;
 
 use crate::heap::{Comparable, peek, pop, push};
 
@@ -20,20 +22,27 @@ static mut TASK_TIMEOUT_ID: f64 = -1.0;
 static mut SCHEDULED_HOST_CALLBACK: Option<fn(bool, f64) -> bool> = None;
 static mut IS_MESSAGE_LOOP_RUNNING: bool = false;
 static mut MESSAGE_CHANNEL: Option<MessageChannel> = None;
-static mut MESSAGE_CHANNEL_LISTENED: bool = false;
+// static mut MESSAGE_CHANNEL_LISTENED: bool = false;
 static mut START_TIME: f64 = -1.0;
-static mut CURRENT_PRIORITY_LEVEL: Priority = Priority::Normal;
+static mut CURRENT_PRIORITY_LEVEL: Priority = Priority::NormalPriority;
 static mut CURRENT_TASK: Option<&mut Box<dyn Comparable>> = None;
+static mut PORT1: Option<MessagePort> = None;
+static mut PORT2: Option<MessagePort> = None;
 
-#[derive(Clone)]
-enum Priority {
-    Normal = 3,
+#[derive(Clone, Debug)]
+#[wasm_bindgen]
+pub enum Priority {
+    ImmediatePriority = 1,
+    UserBlockingPriority = 2,
+    NormalPriority = 3,
+    LowPriority = 4,
+    IdlePriority = 5,
 }
 
 #[wasm_bindgen]
 extern "C" {
     type Performance;
-
+    type Global;
     #[wasm_bindgen(static_method_of = Performance, catch, js_namespace = performance, js_name = now)]
     fn now() -> Result<f64, JsValue>;
     #[wasm_bindgen]
@@ -45,9 +54,12 @@ extern "C" {
 
     #[wasm_bindgen]
     fn setImmediate(f: &Function);
+
+    #[wasm_bindgen(method, getter, js_name = setImmediate)]
+    fn hasSetImmediate(this: &Global) -> JsValue;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Task {
     id: u32,
     callback: JsValue,
@@ -110,7 +122,11 @@ fn unstable_now() -> f64 {
 
 fn get_priority_timeout(priority_level: Priority) -> f64 {
     match priority_level {
-        Priority::Normal => 5000.0,
+        Priority::NormalPriority => 5000.0,
+        Priority::ImmediatePriority => -1.0,
+        Priority::UserBlockingPriority => 250.0,
+        Priority::IdlePriority => 1073741823.0,
+        Priority::LowPriority => 10000.0,
     }
 }
 
@@ -130,25 +146,27 @@ pub fn schedule_perform_work_until_deadline() {
         .clone();
     // let schedule_closure = Closure::wrap(Box::new(schedule_perform_work_until_deadline) as Box<dyn FnMut()>);
 
-    if Reflect::get(&global(), &JsValue::from_str("setImmediate")).is_ok() {
+    if global()
+        .unchecked_into::<Global>()
+        .hasSetImmediate()
+        .is_function()
+    {
         setImmediate(&perform_work_function);
     } else if let Ok(message_channel) = MessageChannel::new() {
         unsafe {
-            let initialized = false;
-            if MESSAGE_CHANNEL.is_none() {
-                MESSAGE_CHANNEL = Some(message_channel);
+            if PORT1.is_none() {
+                PORT1 = Some(message_channel.port1());
+                PORT2 = Some(message_channel.port2())
             }
-            let mc = MESSAGE_CHANNEL.as_ref().unwrap();
-            let port: MessagePort = message_channel.port2();
-            if !MESSAGE_CHANNEL_LISTENED {
-                let on_message_closure =
-                    Closure::wrap(
-                        Box::new(move || perform_work_until_deadline()) as Box<dyn FnMut()>
-                    );
-                port.set_onmessage(Some(&on_message_closure.as_ref().unchecked_ref()));
-                on_message_closure.forget();
-            }
-            port.post_message(&JsValue::null());
+            PORT1
+                .as_ref()
+                .unwrap()
+                .set_onmessage(Some(&perform_work_function));
+            PORT2
+                .as_ref()
+                .unwrap()
+                .post_message(&JsValue::null())
+                .expect("port post message panic");
         }
     } else {
         setTimeout(&perform_work_function, 0.0);
@@ -178,6 +196,41 @@ fn perform_work_until_deadline() {
     }
 }
 
+/**
+static mut MY_V: Vec<Box<Task>> = vec![];
+
+#[derive(Debug)]
+struct Task {
+    id: f64,
+}
+
+fn peek<'a>(v: &'a mut Vec<Box<Task>>) -> &'a Box<Task> {
+    &v[0]
+}
+
+fn pop<'a>(v: &'a mut Vec<Box<Task>>) -> Box<Task> {
+    let t = v.swap_remove(0);
+    t
+}
+
+fn main() {
+    unsafe {
+        MY_V = vec![Box::new(Task {
+            id: 10000.0
+        })];
+
+        let t = peek(&mut MY_V);
+
+        println!("{:?}", t);
+
+        pop(&mut MY_V);
+        // let a = pop(&mut MY_V);
+
+        println!("{:?}", t);
+    };
+}
+
+ */
 fn advance_timers(current_time: f64) {
     unsafe {
         let mut timer = peek(&mut TIMER_QUEUE);
@@ -186,7 +239,7 @@ fn advance_timers(current_time: f64) {
             if task.callback.is_null() {
                 pop(&mut TIMER_QUEUE);
             } else if task.start_time <= current_time {
-                pop(&mut TIMER_QUEUE);
+                let t = pop(&mut TIMER_QUEUE);
                 task.sort_index = task.expiration_time;
                 push(&mut TASK_QUEUE, Box::new(task.clone()));
             } else {
@@ -201,17 +254,28 @@ fn flush_work(has_time_remaining: bool, initial_time: f64) -> bool {
     unsafe {
         IS_HOST_CALLBACK_SCHEDULED = false;
         if IS_HOST_TIMEOUT_SCHEDULED {
+            log!("IS_HOST_TIMEOUT_SCHEDULED");
             IS_HOST_TIMEOUT_SCHEDULED = false;
             cancel_host_timeout();
         }
 
         IS_PERFORMING_WORK = true;
         let previous_priority_level = CURRENT_PRIORITY_LEVEL.clone();
-        return true;
+
+        let has_more = work_loop(has_time_remaining, initial_time).unwrap_or_else(|_| {
+            log!("work_loop error");
+            false
+        });
+
+        CURRENT_TASK = None;
+        CURRENT_PRIORITY_LEVEL = previous_priority_level.clone();
+        IS_PERFORMING_WORK = false;
+
+        return has_more;
     }
 }
 
-fn should_yield_to_host() -> bool {
+pub fn unstable_should_yield_to_host() -> bool {
     unsafe {
         let time_elapsed = unstable_now() - START_TIME;
         if time_elapsed < FRAME_YIELD_MS {
@@ -221,41 +285,61 @@ fn should_yield_to_host() -> bool {
     return true;
 }
 
-fn work_loop(has_time_remaining: bool, initial_time: f64) -> bool {
+fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValue> {
     unsafe {
         let mut current_time = initial_time;
         advance_timers(current_time);
-        CURRENT_TASK = peek(&mut TASK_QUEUE);
-        while CURRENT_TASK.is_some() {
-            let mut t = CURRENT_TASK
-                .as_ref()
+        let mut current_task = peek(&mut TASK_QUEUE);
+        log!(
+            "current_task {:?}",
+            current_task.as_ref()
                 .unwrap()
                 .as_any()
+                .downcast_ref::<Task>()
+                .unwrap()
+        );
+
+        CURRENT_TASK = peek(&mut TASK_QUEUE);
+        while current_task.is_some() {
+            let mut t = current_task
+                .unwrap()
+                .as_mut_any()
                 .downcast_mut::<Task>()
                 .unwrap();
-            if t.expiration_time > current_time && (!has_time_remaining || should_yield_to_host()) {
+            if t.expiration_time > current_time && (!has_time_remaining || unstable_should_yield_to_host()) {
                 break;
             }
 
-            let callback = &t.callback;
+            let callback = t.callback.clone();
             if callback.is_function() {
                 t.callback = JsValue::null();
-                CURRENT_TASK = Some(&mut (Box::new(t.clone()) as Box<dyn Comparable>));
+                // CURRENT_TASK = Some(&mut (Box::new(t.clone()) as Box<dyn Comparable>));
                 CURRENT_PRIORITY_LEVEL = t.priority_level.clone();
                 let did_user_callback_timeout = t.expiration_time <= current_time;
                 let continuation_callback = callback
                     .dyn_ref::<Function>()
                     .unwrap()
-                    .call1(JsValue::null(), did_user_callback_timeout)?;
+                    .call1(&JsValue::null(), &JsValue::from(did_user_callback_timeout))?;
                 current_time = unstable_now();
 
                 if continuation_callback.is_function() {
                     t.callback = continuation_callback;
-                    CURRENT_TASK = Some(&mut (Box::new(t.clone()) as Box<dyn Comparable>));
+                    // let mut boxed_t = Box::new(t.clone()) as Box<dyn Comparable>;
+                    // CURRENT_TASK = Some(&mut boxed_t.clone());
                 } else {
-                    if CURRENT_TASK == peek(&mut TASK_QUEUE) {
+                    if match peek(&mut TASK_QUEUE) {
+                        None => false,
+                        Some(task) => {
+                            let task = task.as_any().downcast_ref::<Task>().unwrap();
+                            log!("{:?} {:?} {:?}", task, t, task == t);
+                            task == t
+                        }
+                    } {
                         pop(&mut TASK_QUEUE);
                     }
+                    // if t == peek(&mut TASK_QUEUE) {
+                    //     pop(&mut TASK_QUEUE);
+                    // }
                 }
 
                 advance_timers(current_time);
@@ -263,14 +347,15 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> bool {
                 pop(&mut TASK_QUEUE);
             }
 
+            current_task = peek(&mut TASK_QUEUE);
             CURRENT_TASK = peek(&mut TASK_QUEUE);
         }
 
-
         if CURRENT_TASK.is_some() {
-            return true;
+            return Ok(true);
         } else {
             let first_timer = peek(&mut TIMER_QUEUE);
+            log!("request_host_timeout");
             if first_timer.is_some() {
                 let task = first_timer
                     .unwrap()
@@ -280,7 +365,7 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> bool {
                 request_host_timeout(handle_timeout, task.start_time - current_time);
             }
 
-            return false;
+            return Ok(false);
         }
     }
 }
@@ -301,10 +386,14 @@ fn handle_timeout(current_time: f64) {
         advance_timers(current_time);
 
         if !IS_HOST_TIMEOUT_SCHEDULED {
+            log!("handle_timeout0 {:?}", TASK_QUEUE.len());
             if peek(&mut TASK_QUEUE).is_some() {
+                log!("handle_timeout1");
                 IS_HOST_CALLBACK_SCHEDULED = true;
                 request_host_callback(flush_work);
             } else {
+                log!("handle_timeout2");
+
                 let first_timer = peek(&mut TIMER_QUEUE);
                 if first_timer.is_some() {
                     let first_timer_task = first_timer
@@ -333,13 +422,32 @@ fn request_host_timeout(callback: fn(f64), ms: f64) {
     }
 }
 
-fn _unstable_schedule_callback(priority_level: Priority, callback: Function, delay: f64) {
+pub fn unstable_cancel_callback(id: u32) {
+    unsafe {
+        for mut task in &mut TASK_QUEUE {
+            let task = task.as_mut_any().downcast_mut::<Task>().unwrap();
+            if task.id == id {
+                task.callback = JsValue::null();
+            }
+        }
+
+        for mut task in &mut TIMER_QUEUE {
+            let task = task.as_mut_any().downcast_mut::<Task>().unwrap();
+            if task.id == id {
+                task.callback = JsValue::null();
+            }
+        }
+    }
+}
+
+pub fn unstable_schedule_callback(priority_level: Priority, callback: Function, delay: f64) -> u32 {
     let current_time = unstable_now();
     let mut start_time = current_time;
-
+    log!("starttime {:?} {:?} {:?}", start_time, delay, start_time + delay);
     if delay > 0.0 {
         start_time += delay;
     }
+
 
     let timeout = get_priority_timeout(priority_level.clone());
     let expiration_time = start_time + timeout;
@@ -349,16 +457,17 @@ fn _unstable_schedule_callback(priority_level: Priority, callback: Function, del
         start_time,
         expiration_time,
     );
+    let id = new_task.id;
     unsafe {
         if start_time > current_time {
             new_task.sort_index = start_time;
             push(&mut TIMER_QUEUE, Box::new(new_task.clone()));
 
             if peek(&mut TASK_QUEUE).is_none() {
-                if let Some(task) = peek(&mut TASK_QUEUE) {
+                if let Some(task) = peek(&mut TIMER_QUEUE) {
                     let task = task.as_any().downcast_ref::<Task>().unwrap();
                     if task == &new_task {
-                        if (IS_HOST_TIMEOUT_SCHEDULED) {
+                        if IS_HOST_TIMEOUT_SCHEDULED {
                             cancel_host_timeout();
                         } else {
                             IS_HOST_TIMEOUT_SCHEDULED = true;
@@ -367,10 +476,20 @@ fn _unstable_schedule_callback(priority_level: Priority, callback: Function, del
                     }
                 }
             }
+        } else {
+            new_task.sort_index = expiration_time;
+            push(&mut TASK_QUEUE, Box::new(new_task));
+
+            if !IS_HOST_CALLBACK_SCHEDULED && !IS_PERFORMING_WORK {
+                IS_HOST_CALLBACK_SCHEDULED = true;
+                request_host_callback(flush_work);
+            }
         }
     }
+
+    id
 }
 
-fn unstable_schedule_callback_no_delay(priority_level: Priority, callback: Function) {
-    _unstable_schedule_callback(priority_level, callback, 0.0)
+pub fn unstable_schedule_callback_no_delay(priority_level: Priority, callback: Function) -> u32 {
+    unstable_schedule_callback(priority_level, callback, 0.0)
 }
