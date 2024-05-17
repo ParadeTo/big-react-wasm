@@ -3,5 +3,6 @@ members = [
     "packages/react",
     "packages/react-dom",
     "packages/react-reconciler",
+    "packages/scheduler",
     "packages/shared"
 ]

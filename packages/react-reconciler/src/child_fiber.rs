@@ -215,7 +215,7 @@ fn update_from_map(
         }
     }
     let before = existing_children.get(&Key(key_to_use.clone())).clone();
-    if type_of(element, "string") {
+    if type_of(element, "string") || type_of(element, "number") {
         let props = create_props_with_content(element.clone());
         if before.is_some() {
             let before = (*before.clone().unwrap()).clone();
