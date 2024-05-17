@@ -1,74 +1,84 @@
-use std::any::Any;
-
-pub trait Comparable {
-    // self lower than Self, return true
-    fn compare(&self, b: &dyn Comparable) -> bool;
-    fn as_any(&self) -> &dyn Any;
-    fn as_mut_any(&mut self) -> &mut dyn Any;
-}
-
-pub fn push(mut heap: &mut Vec<Box<dyn Comparable>>, node: Box<dyn Comparable>) {
-    heap.push(node);
+// 向堆中插入元素
+pub fn push<T: Ord>(heap: &mut Vec<T>, value: T) {
+    heap.push(value);
     sift_up(heap, heap.len() - 1);
 }
 
-pub fn peek(heap: &mut Vec<Box<dyn Comparable>>) -> Option<&mut Box<dyn Comparable>> {
+// 从堆中取出最小的元素
+pub fn pop<T: Ord>(heap: &mut Vec<T>) -> Option<T> {
     if heap.is_empty() {
         return None;
     }
-    return Some(&mut heap[0]);
+    let last_index = heap.len() - 1;
+    heap.swap(0, last_index);
+    let result = heap.pop();
+    if !heap.is_empty() {
+        sift_down(heap, 0);
+    }
+    result
 }
 
-pub fn pop(mut heap: &mut Vec<Box<dyn Comparable>>) -> Option<Box<dyn Comparable>> {
+// 向上调整堆
+fn sift_up<T: Ord>(heap: &mut Vec<T>, mut index: usize) {
+    while index != 0 {
+        let parent = (index - 1) / 2;
+        if heap[parent] <= heap[index] {
+            break;
+        }
+        heap.swap(parent, index);
+        index = parent;
+    }
+}
+
+// 向下调整堆
+fn sift_down<T: Ord>(heap: &mut Vec<T>, mut index: usize) {
+    let len = heap.len();
+    loop {
+        let left_child = index * 2 + 1;
+        let right_child = left_child + 1;
+
+        // 找出当前节点和它的子节点中最小的节点
+        let mut smallest = index;
+        if left_child < len && heap[left_child] < heap[smallest] {
+            smallest = left_child;
+        }
+        if right_child < len && heap[right_child] < heap[smallest] {
+            smallest = right_child;
+        }
+
+        // 如果当前节点是最小的，那么堆已经是正确的了
+        if smallest == index {
+            break;
+        }
+
+        // 否则，交换当前节点和最小的节点
+        heap.swap(index, smallest);
+        index = smallest;
+    }
+}
+
+pub fn peek<T: Ord>(heap: &Vec<T>) -> Option<&T> {
+    heap.get(0)
+}
+
+pub fn is_empty<T: Ord>(heap: &Vec<T>) -> bool {
+    heap.is_empty()
+}
+
+pub fn peek_mut<T: Ord>(heap: &mut Vec<T>) -> Option<&mut T> {
     if heap.is_empty() {
         None
     } else {
-        let min = heap.swap_remove(0);
-        if !heap.is_empty() {
-            bubble_down(heap, 0);
-        }
-        Some(min)
+        Some(&mut heap[0])
     }
 }
 
-fn bubble_down(mut heap: &mut Vec<Box<dyn Comparable>>, index: usize) {
-    let mut parent = index;
-
-    loop {
-        let mut child = 2 * parent + 1;
-        if child >= heap.len() {
-            break;
-        }
-        if child + 1 < heap.len() && heap[child + 1].compare(&*heap[child]) {
-            child += 1;
-        }
-        if heap[parent].compare(&*heap[child]) {
-            break;
-        }
-        heap.swap(parent, child);
-        parent = child;
-    }
-}
-
-fn sift_up(mut heap: &mut Vec<Box<dyn Comparable>>, i: usize) {
-    let mut child = i;
-    if child <= 0 {
-        return;
-    }
-    let mut parent = (child - 1) / 2;
-
-    while child > 0 && !&heap[parent].compare(&*heap[child]) {
-        heap.swap(parent, child);
-        child = parent;
-        parent = ((child as isize - 1) / 2) as usize;
-    }
-}
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
+    use std::cmp::Ordering;
 
-    use crate::heap::{Comparable, pop, push};
+    use crate::heap::{pop, push};
 
     #[derive(Clone)]
     struct Task {
@@ -92,83 +102,64 @@ mod tests {
         }
     }
 
+    impl Eq for Task {}
+
     impl PartialEq for Task {
         fn eq(&self, other: &Self) -> bool {
-            self.id == other.id
+            self.id.cmp(&other.id) == Ordering::Equal
         }
     }
 
-    impl Comparable for Task {
-        fn compare(&self, other: &dyn Comparable) -> bool {
-            let other = other.as_any().downcast_ref::<Task>().unwrap();
-            let diff = self.sort_index - other.sort_index;
-            if diff != 0.0 {
-                return diff < 0.0;
+    impl PartialOrd for Task {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            let mut sort_index_ordering;
+
+            if self.sort_index.is_nan() {
+                if other.sort_index.is_nan() {
+                    sort_index_ordering = Ordering::Equal
+                } else {
+                    sort_index_ordering = Ordering::Less
+                }
+            } else if other.sort_index.is_nan() {
+                sort_index_ordering = (Ordering::Greater)
+            } else {
+                sort_index_ordering = self.sort_index.partial_cmp(&other.sort_index).unwrap()
             }
-            (self.id as i32 - other.id as i32) < 0
-        }
 
-        fn as_any(&self) -> &dyn Any {
-            self
+            if sort_index_ordering != Ordering::Equal {
+                return Some(sort_index_ordering);
+            }
+            return self.id.partial_cmp(&other.id);
         }
+    }
 
-        fn as_mut_any(&mut self) -> &mut dyn Any {
-            self
+    impl Ord for Task {
+        fn cmp(&self, other: &Self) -> Ordering {
+            self.partial_cmp(other).unwrap_or(Ordering::Equal)
         }
     }
 
     #[test]
     fn test_min_heap() {
-        let mut heap = &mut vec![];
+        let mut heap = vec![];
 
         let task3 = Task::new(3, 3.0);
         let task2 = Task::new(2, 2.0);
         let task1 = Task::new(1, 1.0);
         let task4 = Task::new(4, 4.0);
-        // 添加任务到堆中
-        push(heap, Box::new(task3.clone()));
-        push(heap, Box::new(task2.clone()));
-        push(heap, Box::new(task1.clone()));
-        push(heap, Box::new(task4.clone()));
+
+        push(&mut heap, task3);
+        push(&mut heap, task2);
+        push(&mut heap, task1);
+        push(&mut heap, task4);
 
         // 按预期顺序弹出任务
-        assert_eq!(
-            pop(heap)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<Task>()
-                .unwrap()
-                == &task1,
-            true
-        );
-        assert_eq!(
-            pop(heap)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<Task>()
-                .unwrap()
-                == &task2,
-            true
-        );
-        assert_eq!(
-            pop(heap)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<Task>()
-                .unwrap()
-                == &task3,
-            true
-        );
-        assert_eq!(
-            pop(heap)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<Task>()
-                .unwrap()
-                == &task4,
-            true
-        );
+        assert_eq!(pop(&mut heap).unwrap().id == 1, true);
+        assert_eq!(pop(&mut heap).unwrap().id == 2, true);
+        assert_eq!(pop(&mut heap).unwrap().id == 3, true);
+        assert_eq!(pop(&mut heap).unwrap().id == 4, true);
+
         // 堆应该为空
-        assert!(pop(heap).is_none());
+        assert!(heap.pop().is_none());
     }
 }
