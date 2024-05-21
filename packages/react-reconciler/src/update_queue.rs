@@ -7,6 +7,7 @@ use web_sys::js_sys::Function;
 use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
+use crate::fiber_hooks::Effect;
 use crate::fiber_lanes::Lane;
 
 #[derive(Clone, Debug)]
@@ -28,6 +29,7 @@ pub struct UpdateType {
 pub struct UpdateQueue {
     pub shared: UpdateType,
     pub dispatch: Option<Function>,
+    pub last_effect: Option<Rc<RefCell<Effect>>>,
 }
 
 pub fn create_update(action: JsValue, lane: Lane) -> Update {
@@ -56,6 +58,7 @@ pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
     Rc::new(RefCell::new(UpdateQueue {
         shared: UpdateType { pending: None },
         dispatch: None,
+        last_effect: None,
     }))
 }
 

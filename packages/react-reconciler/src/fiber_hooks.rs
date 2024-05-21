@@ -3,12 +3,13 @@ use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen::prelude::{Closure, wasm_bindgen};
-use web_sys::js_sys::{Function, Object, Reflect};
+use web_sys::js_sys::{Array, Function, Object, Reflect};
 
 use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_lanes::{Lane, request_update_lane};
+use crate::hook_effect_tags::HookEffectTags;
 use crate::update_queue::{
     create_update, create_update_queue, enqueue_update, process_update_queue, UpdateQueue,
 };
@@ -23,6 +24,34 @@ static mut CURRENTLY_RENDERING_FIBER: Option<Rc<RefCell<FiberNode>>> = None;
 static mut WORK_IN_PROGRESS_HOOK: Option<Rc<RefCell<Hook>>> = None;
 static mut CURRENT_HOOK: Option<Rc<RefCell<Hook>>> = None;
 static mut RENDER_LANE: Lane = Lane::NoLane;
+
+#[derive(Debug)]
+pub struct Effect {
+    tag: HookEffectTags,
+    create: Function,
+    destroy: Function,
+    deps: Array,
+    next: Option<Rc<RefCell<Effect>>>,
+}
+
+impl Effect {
+    fn new(
+        tag: HookEffectTags,
+        create: Function,
+        destroy: Function,
+        deps: Array,
+        next: Option<Rc<RefCell<Effect>>>,
+    ) -> Self {
+        Self {
+            tag,
+            create,
+            deps,
+            destroy,
+            next,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct Hook {
@@ -48,16 +77,38 @@ impl Hook {
 fn update_hooks_to_dispatcher(is_update: bool) {
     let object = Object::new();
 
-    let closure = Closure::wrap(Box::new(if is_update { update_state } else { mount_state })
-        as Box<dyn Fn(&JsValue) -> Result<Vec<JsValue>, JsValue>>);
-    let function = closure.as_ref().unchecked_ref::<Function>().clone();
-    closure.forget();
-    Reflect::set(&object, &"use_state".into(), &function).expect("TODO: panic set use_state");
+    // use_state
+    let use_state_closure =
+        Closure::wrap(Box::new(if is_update { update_state } else { mount_state })
+            as Box<dyn Fn(&JsValue) -> Result<Vec<JsValue>, JsValue>>);
+    let use_state = use_state_closure
+        .as_ref()
+        .unchecked_ref::<Function>()
+        .clone();
+    use_state_closure.forget();
+
+    // use_effect
+    let use_effect_closure = Closure::wrap(Box::new(if is_update {
+        update_effect
+    } else {
+        mount_effect
+    }) as Box<dyn Fn(JsValue, JsValue)>);
+    let use_effect = use_effect_closure
+        .as_ref()
+        .unchecked_ref::<Function>()
+        .clone();
+    use_effect_closure.forget();
+
+    Reflect::set(&object, &"use_state".into(), &use_state).expect("TODO: panic set use_state");
+    Reflect::set(&object, &"use_effect".into(), &use_effect).expect("TODO: panic set use_effect");
 
     updateDispatcher(&object.into());
 }
 
-pub fn render_with_hooks(work_in_progress: Rc<RefCell<FiberNode>>, lane: Lane) -> Result<JsValue, JsValue> {
+pub fn render_with_hooks(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    lane: Lane,
+) -> Result<JsValue, JsValue> {
     unsafe {
         CURRENTLY_RENDERING_FIBER = Some(work_in_progress.clone());
         RENDER_LANE = lane;
@@ -292,3 +343,30 @@ fn dispatch_set_state(
         schedule_update_on_fiber(fiber.clone(), lane);
     }
 }
+
+fn create_fc_update_queue() -> Rc<RefCell<UpdateQueue>> {
+    let update_queue = create_update_queue();
+    update_queue.borrow_mut().last_effect = None;
+    update_queue
+}
+
+fn push_effect(hook_flags: HookEffectTags, create: Function, destroy: Function, deps: Array) -> Effect {
+    let mut effect = Rc::new(RefCell::new(Effect::new(hook_flags, create, destroy, deps, None)));
+    let fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap() };
+    let update_queue = { fiber.borrow().update_queue.as_ref() };
+    if update_queue.is_none() {
+        let update_queue = create_fc_update_queue();
+        fiber.borrow_mut().update_queue = Some(update_queue.clone());
+        effect.borrow_mut().next = Option::from(effect.clone());
+        update_queue.borrow_mut().last_effect = Option::from(effect.clone());
+    } else {}
+    return effect;
+}
+
+fn mount_effect(create: JsValue, deps: JsValue) {
+    let hook = mount_work_in_progress_hook();
+    // let next_deps = deps.is_undefined() ?
+    log!("create {:?}", create);
+}
+
+fn update_effect(create: JsValue, deps: JsValue) {}

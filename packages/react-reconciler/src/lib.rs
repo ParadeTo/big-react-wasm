@@ -24,6 +24,7 @@ mod work_loop;
 mod work_tags;
 mod fiber_lanes;
 mod sync_task_queue;
+mod hook_effect_tags;
 
 pub static mut HOST_CONFIG: Option<Rc<dyn HostConfig>> = None;
 static mut COMPLETE_WORK: Option<CompleteWork> = None;

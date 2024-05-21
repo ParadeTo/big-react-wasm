@@ -1,8 +1,10 @@
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 
 function App() {
     const [num, updateNum] = useState(0);
+    useEffect(() => {
 
+    }, []);
     return (
         <ul
             onClick={(e) => {
