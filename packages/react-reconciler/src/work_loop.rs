@@ -167,12 +167,7 @@ fn flush_passive_effects(pending_passive_effects: Rc<RefCell<PendingPassiveEffec
         {
             log!("Cannot execute useEffect callback in React work loop")
         }
-
-        log!(
-            "flush_passive_effects {:?}",
-            pending_passive_effects.clone().borrow().unmount
-        );
-
+        
         for effect in &pending_passive_effects.borrow().unmount {
             CommitWork::commit_hook_effect_list_destroy(Flags::Passive, effect.clone());
         }
@@ -223,8 +218,8 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
         if unsafe { !ROOT_DOES_HAVE_PASSIVE_EFFECTS } {
             unsafe { ROOT_DOES_HAVE_PASSIVE_EFFECTS = true }
             let closure = Closure::wrap(Box::new(move || {
-                flush_passive_effects(root_cloned.borrow().pending_passive_effects.clone())
-            }) as Box<dyn Fn()>);
+                flush_passive_effects(root_cloned.borrow().pending_passive_effects.clone());
+            }) as Box<dyn Fn() -> bool>);
             let function = closure.as_ref().unchecked_ref::<Function>().clone();
             closure.forget();
             unstable_schedule_callback_no_delay(Priority::NormalPriority, function);

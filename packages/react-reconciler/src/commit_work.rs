@@ -47,7 +47,6 @@ impl CommitWork {
                 log!("When FC has PassiveEffect, the effect should exist.")
             }
             if _type == "unmount" {
-                log!("commit_passive_effect {:?}", update_queue.borrow().last_effect.clone().unwrap().borrow().create);
                 root.borrow()
                     .pending_passive_effects
                     .borrow_mut()
@@ -85,8 +84,7 @@ impl CommitWork {
     }
     pub fn commit_hook_effect_list_destroy(flags: Flags, last_effect: Rc<RefCell<Effect>>) {
         CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
-            let destroy = &effect.borrow().destroy;
-            log!("commit_hook_effect_list_destroy {:?}", destroy);
+            let destroy = { effect.borrow().destroy.clone() };
             if destroy.is_function() {
                 destroy.dyn_ref::<Function>().unwrap().call0(&JsValue::null());
             }
