@@ -2,7 +2,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::Function;
 
 use shared::{derive_from_js_value, log};
@@ -47,6 +47,7 @@ impl CommitWork {
                 log!("When FC has PassiveEffect, the effect should exist.")
             }
             if _type == "unmount" {
+                log!("commit_passive_effect {:?}", update_queue.borrow().last_effect.clone().unwrap().borrow().create);
                 root.borrow()
                     .pending_passive_effects
                     .borrow_mut()
@@ -85,8 +86,9 @@ impl CommitWork {
     pub fn commit_hook_effect_list_destroy(flags: Flags, last_effect: Rc<RefCell<Effect>>) {
         CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
             let destroy = &effect.borrow().destroy;
+            log!("commit_hook_effect_list_destroy {:?}", destroy);
             if destroy.is_function() {
-                destroy.call0(&JsValue::null());
+                destroy.dyn_ref::<Function>().unwrap().call0(&JsValue::null());
             }
             effect.borrow_mut().tag &= !Flags::HookHasEffect;
         });
@@ -96,17 +98,17 @@ impl CommitWork {
         CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
             let destroy = &effect.borrow().destroy;
             if destroy.is_function() {
-                destroy.call0(&JsValue::null());
+                destroy.dyn_ref::<Function>().unwrap().call0(&JsValue::null());
             }
         });
     }
 
     pub fn commit_hook_effect_list_mount(flags: Flags, last_effect: Rc<RefCell<Effect>>) {
         CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
-            let create = &effect.borrow().create;
+            let create = { effect.borrow().create.clone() };
             if create.is_function() {
                 let destroy = create.call0(&JsValue::null()).unwrap();
-                effect.borrow_mut().destroy = Function::from(destroy.clone());
+                effect.borrow_mut().destroy = destroy;
             }
         });
     }

@@ -13,7 +13,7 @@ use crate::{COMMIT_WORK, COMPLETE_WORK, HOST_CONFIG, HostConfig};
 use crate::begin_work::begin_work;
 use crate::commit_work::CommitWork;
 use crate::fiber::{FiberNode, FiberRootNode, PendingPassiveEffects, StateNode};
-use crate::fiber_flags::{Flags, get_mutation_mask};
+use crate::fiber_flags::{Flags, get_mutation_mask, get_passive_mask};
 use crate::fiber_lanes::{get_highest_priority, Lane, merge_lanes};
 use crate::sync_task_queue::{flush_sync_callbacks, schedule_sync_callback};
 use crate::work_tags::WorkTag;
@@ -168,16 +168,27 @@ fn flush_passive_effects(pending_passive_effects: Rc<RefCell<PendingPassiveEffec
             log!("Cannot execute useEffect callback in React work loop")
         }
 
+        log!(
+            "flush_passive_effects {:?}",
+            pending_passive_effects.clone().borrow().unmount
+        );
+
         for effect in &pending_passive_effects.borrow().unmount {
             CommitWork::commit_hook_effect_list_destroy(Flags::Passive, effect.clone());
         }
         pending_passive_effects.borrow_mut().unmount = vec![];
 
         for effect in &pending_passive_effects.borrow().update {
-            CommitWork::commit_hook_effect_list_unmount(Flags::Passive | Flags::HookHasEffect, effect.clone());
+            CommitWork::commit_hook_effect_list_unmount(
+                Flags::Passive | Flags::HookHasEffect,
+                effect.clone(),
+            );
         }
         for effect in &pending_passive_effects.borrow().update {
-            CommitWork::commit_hook_effect_list_mount(Flags::Passive | Flags::HookHasEffect, effect.clone());
+            CommitWork::commit_hook_effect_list_mount(
+                Flags::Passive | Flags::HookHasEffect,
+                effect.clone(),
+            );
         }
         pending_passive_effects.borrow_mut().update = vec![];
     }
@@ -204,27 +215,24 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
     let flags = finished_work.borrow().flags.clone();
     // useEffect
     let root_cloned = root.clone();
-    if flags.contains(Flags::PassiveEffect) || subtree_flags.contains(Flags::PassiveEffect) {
+    log!("flags {:?} {:?}", flags, subtree_flags);
+    let passive_mask = get_passive_mask();
+    if flags.clone() & passive_mask.clone() != Flags::NoFlags
+        || subtree_flags.clone() & passive_mask != Flags::NoFlags
+    {
         if unsafe { !ROOT_DOES_HAVE_PASSIVE_EFFECTS } {
             unsafe { ROOT_DOES_HAVE_PASSIVE_EFFECTS = true }
-            let closure =
-                Closure::wrap(Box::new(move || {
-                    flush_passive_effects(root_cloned.borrow().pending_passive_effects.clone())
-                })
-                    as Box<dyn Fn()>);
-            let function = closure
-                .as_ref()
-                .unchecked_ref::<Function>()
-                .clone();
+            let closure = Closure::wrap(Box::new(move || {
+                flush_passive_effects(root_cloned.borrow().pending_passive_effects.clone())
+            }) as Box<dyn Fn()>);
+            let function = closure.as_ref().unchecked_ref::<Function>().clone();
             closure.forget();
             unstable_schedule_callback_no_delay(Priority::NormalPriority, function);
         }
     }
 
-    let subtree_has_effect =
-        get_mutation_mask().contains(subtree_flags);
-    let root_has_effect =
-        get_mutation_mask().contains(flags);
+    let subtree_has_effect = get_mutation_mask().contains(subtree_flags);
+    let root_has_effect = get_mutation_mask().contains(flags);
 
     if subtree_has_effect || root_has_effect {
         let prev_execution_context: ExecutionContext;
@@ -233,7 +241,12 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
             EXECUTION_CONTEXT |= ExecutionContext::CommitContext;
         }
 
-        unsafe { COMMIT_WORK.as_mut().unwrap().commit_mutation_effects(finished_work.clone(), root.clone()); }
+        unsafe {
+            COMMIT_WORK
+                .as_mut()
+                .unwrap()
+                .commit_mutation_effects(finished_work.clone(), root.clone());
+        }
 
         cloned.borrow_mut().current = finished_work.clone();
 

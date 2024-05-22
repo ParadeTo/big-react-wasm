@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen::prelude::{Closure, wasm_bindgen};
-use web_sys::js_sys::{Array, Function, Object, Reflect};
+use web_sys::js_sys::{Function, Object, Reflect};
 
 use shared::log;
 
@@ -29,8 +29,8 @@ static mut RENDER_LANE: Lane = Lane::NoLane;
 pub struct Effect {
     pub tag: Flags,
     pub create: Function,
-    pub destroy: Function,
-    pub deps: Array,
+    pub destroy: JsValue,
+    pub deps: JsValue,
     pub next: Option<Rc<RefCell<Effect>>>,
 }
 
@@ -38,8 +38,8 @@ impl Effect {
     fn new(
         tag: Flags,
         create: Function,
-        destroy: Function,
-        deps: Array,
+        destroy: JsValue,
+        deps: JsValue,
         next: Option<Rc<RefCell<Effect>>>,
     ) -> Self {
         Self {
@@ -51,7 +51,6 @@ impl Effect {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Hook {
@@ -92,7 +91,7 @@ fn update_hooks_to_dispatcher(is_update: bool) {
         update_effect
     } else {
         mount_effect
-    }) as Box<dyn Fn(JsValue, JsValue)>);
+    }) as Box<dyn Fn(Function, JsValue)>);
     let use_effect = use_effect_closure
         .as_ref()
         .unchecked_ref::<Function>()
@@ -350,8 +349,15 @@ fn create_fc_update_queue() -> Rc<RefCell<UpdateQueue>> {
     update_queue
 }
 
-fn push_effect(hook_flags: Flags, create: Function, destroy: Function, deps: Array) -> Rc<RefCell<Effect>> {
-    let mut effect = Rc::new(RefCell::new(Effect::new(hook_flags, create, destroy, deps, None)));
+fn push_effect(
+    hook_flags: Flags,
+    create: Function,
+    destroy: JsValue,
+    deps: JsValue,
+) -> Rc<RefCell<Effect>> {
+    let mut effect = Rc::new(RefCell::new(Effect::new(
+        hook_flags, create, destroy, deps, None,
+    )));
     let fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap() };
     let update_queue = { fiber.borrow().update_queue.clone() };
     if update_queue.is_none() {
@@ -359,14 +365,45 @@ fn push_effect(hook_flags: Flags, create: Function, destroy: Function, deps: Arr
         fiber.borrow_mut().update_queue = Some(update_queue.clone());
         effect.borrow_mut().next = Option::from(effect.clone());
         update_queue.borrow_mut().last_effect = Option::from(effect.clone());
-    } else {}
+    } else {
+        let update_queue = update_queue.unwrap();
+        let last_effect = update_queue.borrow().last_effect.clone();
+        if last_effect.is_none() {
+            effect.borrow_mut().next = Some(effect.clone());
+            update_queue.borrow_mut().last_effect = Some(effect.clone());
+        } else {
+            let last_effect = last_effect.unwrap();
+            let first_effect = last_effect.borrow().next.clone();
+            last_effect.borrow_mut().next = Some(effect.clone());
+            effect.borrow_mut().next = first_effect;
+            update_queue.borrow_mut().last_effect = Some(effect.clone());
+        }
+    }
     return effect;
 }
 
-fn mount_effect(create: JsValue, deps: JsValue) {
+fn mount_effect(create: Function, deps: JsValue) {
     let hook = mount_work_in_progress_hook();
+    let next_deps = if deps.is_undefined() {
+        JsValue::null()
+    } else {
+        deps
+    };
+
+    // 注意区分PassiveEffect与Passive，PassiveEffect是针对fiber.flags
+    // Passive是effect类型，代表useEffect。类似的，Layout代表useLayoutEffect
+    let currently_rendering_fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap() };
+    currently_rendering_fiber.borrow_mut().flags |= Flags::PassiveEffect;
+    hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+        Some(MemoizedState::Effect(push_effect(
+            Flags::Passive | Flags::HookHasEffect,
+            create,
+            JsValue::null(),
+            next_deps,
+        )));
+
     // let next_deps = deps.is_undefined() ?
-    log!("create {:?}", create);
+    // log!("create {:?}", create);
 }
 
-fn update_effect(create: JsValue, deps: JsValue) {}
+fn update_effect(create: Function, deps: JsValue) {}

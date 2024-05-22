@@ -5,8 +5,6 @@ use wasm_bindgen::prelude::*;
 use web_sys::{MessageChannel, MessagePort};
 use web_sys::js_sys::{Function, global};
 
-use shared::log;
-
 use crate::heap::{peek, peek_mut, pop, push};
 
 mod heap;
@@ -273,10 +271,11 @@ fn flush_work(has_time_remaining: bool, initial_time: f64) -> bool {
         IS_PERFORMING_WORK = true;
         let previous_priority_level = CURRENT_PRIORITY_LEVEL.clone();
 
-        let has_more = work_loop(has_time_remaining, initial_time).unwrap_or_else(|_| {
-            log!("work_loop error");
-            false
-        });
+        let has_more = work_loop(has_time_remaining, initial_time).unwrap();
+        //     .unwrap_or_else(|_| {
+        //     log!("work_loop error");
+        //     false
+        // });
 
         CURRENT_TASK = None;
         CURRENT_PRIORITY_LEVEL = previous_priority_level.clone();

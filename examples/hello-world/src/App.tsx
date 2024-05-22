@@ -2,9 +2,7 @@ import {useEffect, useState} from 'react'
 
 function App() {
     const [num, updateNum] = useState(0);
-    useEffect(() => {
 
-    }, []);
     return (
         <ul
             onClick={(e) => {
@@ -16,11 +14,18 @@ function App() {
             }}
         >
             num值为：{num}
+            {num === 0 && <Child num={1}/>}
         </ul>
     );
 }
 
 function Child({num}: { num: number }) {
+    useEffect(() => {
+        console.log('this is useEffect')
+        return () => {
+            console.log('this is destroy')
+        }
+    }, []);
     return <div>{num}</div>;
 }
 
