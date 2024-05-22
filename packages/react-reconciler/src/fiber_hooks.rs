@@ -8,8 +8,8 @@ use web_sys::js_sys::{Array, Function, Object, Reflect};
 use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
+use crate::fiber_flags::Flags;
 use crate::fiber_lanes::{Lane, request_update_lane};
-use crate::hook_effect_tags::HookEffectTags;
 use crate::update_queue::{
     create_update, create_update_queue, enqueue_update, process_update_queue, UpdateQueue,
 };
@@ -25,18 +25,18 @@ static mut WORK_IN_PROGRESS_HOOK: Option<Rc<RefCell<Hook>>> = None;
 static mut CURRENT_HOOK: Option<Rc<RefCell<Hook>>> = None;
 static mut RENDER_LANE: Lane = Lane::NoLane;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Effect {
-    tag: HookEffectTags,
-    create: Function,
-    destroy: Function,
-    deps: Array,
-    next: Option<Rc<RefCell<Effect>>>,
+    pub tag: Flags,
+    pub create: Function,
+    pub destroy: Function,
+    pub deps: Array,
+    pub next: Option<Rc<RefCell<Effect>>>,
 }
 
 impl Effect {
     fn new(
-        tag: HookEffectTags,
+        tag: Flags,
         create: Function,
         destroy: Function,
         deps: Array,
@@ -350,10 +350,10 @@ fn create_fc_update_queue() -> Rc<RefCell<UpdateQueue>> {
     update_queue
 }
 
-fn push_effect(hook_flags: HookEffectTags, create: Function, destroy: Function, deps: Array) -> Effect {
+fn push_effect(hook_flags: Flags, create: Function, destroy: Function, deps: Array) -> Rc<RefCell<Effect>> {
     let mut effect = Rc::new(RefCell::new(Effect::new(hook_flags, create, destroy, deps, None)));
     let fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap() };
-    let update_queue = { fiber.borrow().update_queue.as_ref() };
+    let update_queue = { fiber.borrow().update_queue.clone() };
     if update_queue.is_none() {
         let update_queue = create_fc_update_queue();
         fiber.borrow_mut().update_queue = Some(update_queue.clone());

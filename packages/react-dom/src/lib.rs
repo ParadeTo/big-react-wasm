@@ -5,7 +5,10 @@ use wasm_bindgen::prelude::*;
 use web_sys::Node;
 
 use react_reconciler::Reconciler;
-use scheduler::{Priority, unstable_cancel_callback, unstable_schedule_callback as origin_unstable_schedule_callback, unstable_should_yield_to_host};
+use scheduler::{
+    Priority, unstable_cancel_callback,
+    unstable_schedule_callback as origin_unstable_schedule_callback, unstable_should_yield_to_host,
+};
 
 use crate::host_config::ReactDomHostConfig;
 use crate::renderer::Renderer;
@@ -32,7 +35,11 @@ pub fn create_root(container: &JsValue) -> Renderer {
 }
 
 #[wasm_bindgen(js_name = scheduleCallback, variadic)]
-pub fn unstable_schedule_callback(priority_level: Priority, callback: Function, delay: &JsValue) -> u32 {
+pub fn unstable_schedule_callback(
+    priority_level: Priority,
+    callback: Function,
+    delay: &JsValue,
+) -> u32 {
     let delay = delay.dyn_ref::<Array>().unwrap();
     let d = delay.get(0).as_f64().unwrap_or_else(|| 0.0);
     origin_unstable_schedule_callback(priority_level, callback, d)
@@ -47,4 +54,3 @@ pub fn cancel_callback(id: u32) {
 pub fn should_yield_to_host() -> bool {
     unstable_should_yield_to_host()
 }
-

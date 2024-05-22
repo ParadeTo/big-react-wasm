@@ -203,9 +203,9 @@ fn update_from_map(
     index: u32,
     element: &JsValue,
     should_track_effects: bool,
-) -> Rc<RefCell<FiberNode>> {
+) -> Option<Rc<RefCell<FiberNode>>> {
     let key_to_use;
-    if type_of(element, "string") {
+    if type_of(element, "string") || type_of(element, "null") {
         key_to_use = JsValue::from(index);
     } else {
         let key = derive_from_js_value(element, "key");
@@ -215,22 +215,24 @@ fn update_from_map(
         }
     }
     let before = existing_children.get(&Key(key_to_use.clone())).clone();
-    if type_of(element, "string") || type_of(element, "number") {
+    if type_of(element, "null") || type_of(element, "string") || type_of(element, "number") {
         let props = create_props_with_content(element.clone());
         if before.is_some() {
             let before = (*before.clone().unwrap()).clone();
             existing_children.remove(&Key(key_to_use.clone()));
             if before.borrow().tag == HostText {
-                return use_fiber(before.clone(), props.clone());
+                return Some(use_fiber(before.clone(), props.clone()));
             } else {
                 delete_child(return_fiber, before, should_track_effects);
             }
         }
-        return Rc::new(RefCell::new(FiberNode::new(
-            WorkTag::HostText,
-            props.clone(),
-            JsValue::null(),
-        )));
+        return if type_of(element, "null") { None } else {
+            Some(Rc::new(RefCell::new(FiberNode::new(
+                WorkTag::HostText,
+                props.clone(),
+                JsValue::null(),
+            ))))
+        };
     } else if type_of(element, "object") && !element.is_null() {
         if derive_from_js_value(&(*element).clone(), "$$typeof") != REACT_ELEMENT_TYPE {
             panic!("Undefined $$typeof");
@@ -243,15 +245,16 @@ fn update_from_map(
                 &before.borrow()._type,
                 &derive_from_js_value(&(*element).clone(), "type"),
             ) {
-                return use_fiber(before.clone(), derive_from_js_value(element, "props"));
+                return Some(use_fiber(before.clone(), derive_from_js_value(element, "props")));
             } else {
                 delete_child(return_fiber, before, should_track_effects);
             }
         }
 
-        return Rc::new(RefCell::new(FiberNode::create_fiber_from_element(element)));
+        return Some(Rc::new(RefCell::new(FiberNode::create_fiber_from_element(element))));
     }
-    panic!("update_from_map unsupported");
+    // panic!("update_from_map unsupported");
+    None
 }
 
 fn reconcile_children_array(
@@ -289,6 +292,13 @@ fn reconcile_children_array(
             &after,
             should_track_effects,
         );
+
+        if new_fiber.is_none() {
+            continue;
+        }
+
+        let new_fiber = new_fiber.unwrap();
+
         {
             new_fiber.borrow_mut().index = i;
             new_fiber.borrow_mut()._return = Some(return_fiber.clone());

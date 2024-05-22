@@ -29,11 +29,17 @@ pub enum MemoizedState {
     Effect(Rc<RefCell<Effect>>),
 }
 
+#[derive(Debug, Clone)]
+pub struct PendingPassiveEffects {
+    pub unmount: Vec<Rc<RefCell<Effect>>>,
+    pub update: Vec<Rc<RefCell<Effect>>>,
+}
+
 impl MemoizedState {
     pub fn js_value(&self) -> Option<JsValue> {
         match self {
             MemoizedState::MemoizedJsValue(js_value) => Some(js_value.clone()),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -84,10 +90,7 @@ impl Debug for FiberNode {
                 write!(
                     f,
                     "{:?}(key:{:?}, flags:{:?}, subtreeFlags:{:?})",
-                    self._type,
-                    self.key,
-                    self.flags,
-                    self.subtree_flags
+                    self._type, self.key, self.flags, self.subtree_flags
                 )
                     .expect("print error");
             }
@@ -96,10 +99,7 @@ impl Debug for FiberNode {
                     f,
                     "{:?}(state_node:{:?}, flags:{:?})",
                     self.tag,
-                    Reflect::get(
-                        self.pending_props.as_ref(),
-                        &JsValue::from_str("content"),
-                    )
+                    Reflect::get(self.pending_props.as_ref(), &JsValue::from_str("content"))
                         .unwrap(),
                     self.flags
                 )
@@ -233,6 +233,7 @@ pub struct FiberRootNode {
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
     pub pending_lanes: Lane,
     pub finished_lane: Lane,
+    pub pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>,
 }
 
 impl FiberRootNode {
@@ -243,6 +244,10 @@ impl FiberRootNode {
             finished_work: None,
             pending_lanes: Lane::NoLane,
             finished_lane: Lane::NoLane,
+            pending_passive_effects: Rc::new(RefCell::new(PendingPassiveEffects {
+                unmount: vec![],
+                update: vec![],
+            })),
         }
     }
 
@@ -262,10 +267,7 @@ struct QueueItem {
 
 impl QueueItem {
     fn new(node: Rc<RefCell<FiberNode>>, depth: u32) -> Self {
-        Self {
-            node,
-            depth,
-        }
+        Self { node, depth }
     }
 }
 
@@ -276,7 +278,11 @@ impl Debug for FiberRootNode {
             let mut queue = VecDeque::new();
             queue.push_back(QueueItem::new(Rc::clone(&node), 0));
 
-            while let Some(QueueItem { node: current, depth }) = queue.pop_front() {
+            while let Some(QueueItem {
+                               node: current,
+                               depth,
+                           }) = queue.pop_front()
+            {
                 let current_ref = current.borrow();
 
                 write!(f, "{:?}", current_ref).expect("TODO: panic print FiberNode");
@@ -285,16 +291,22 @@ impl Debug for FiberRootNode {
                     queue.push_back(QueueItem::new(Rc::clone(child), depth + 1));
                     let mut sibling = child.clone().borrow().sibling.clone();
                     while sibling.is_some() {
-                        queue.push_back(QueueItem::new(Rc::clone(sibling.as_ref().unwrap()), depth + 1));
+                        queue.push_back(QueueItem::new(
+                            Rc::clone(sibling.as_ref().unwrap()),
+                            depth + 1,
+                        ));
                         sibling = sibling.as_ref().unwrap().clone().borrow().sibling.clone();
                     }
                 }
 
-                if let Some(QueueItem { node: next, depth: next_depth }) = queue.front() {
+                if let Some(QueueItem {
+                                node: next,
+                                depth: next_depth,
+                            }) = queue.front()
+                {
                     if *next_depth != depth {
                         writeln!(f, "").expect("print error");
-                        writeln!(f, "------------------------------------")
-                            .expect("print error");
+                        writeln!(f, "------------------------------------").expect("print error");
                         continue;
                     }
 

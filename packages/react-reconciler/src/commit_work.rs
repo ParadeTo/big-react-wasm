@@ -2,10 +2,14 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use wasm_bindgen::JsValue;
+use web_sys::js_sys::Function;
+
 use shared::{derive_from_js_value, log};
 
-use crate::fiber::{FiberNode, StateNode};
-use crate::fiber_flags::{Flags, get_mutation_mask};
+use crate::fiber::{FiberNode, FiberRootNode, StateNode};
+use crate::fiber_flags::{Flags, get_mutation_mask, get_passive_mask};
+use crate::fiber_hooks::Effect;
 use crate::HostConfig;
 use crate::work_tags::WorkTag;
 use crate::work_tags::WorkTag::{HostComponent, HostRoot, HostText};
@@ -22,18 +26,112 @@ impl CommitWork {
             host_config,
         }
     }
-    pub fn commit_mutation_effects(&mut self, finished_work: Rc<RefCell<FiberNode>>) {
+
+    fn commit_passive_effect(
+        finished_work: Rc<RefCell<FiberNode>>,
+        root: Rc<RefCell<FiberRootNode>>,
+        _type: &str,
+    ) {
+        let finished_work_b = finished_work.borrow();
+        if finished_work_b.tag != WorkTag::FunctionComponent
+            || (_type == "update"
+            && (finished_work_b.flags.clone() & Flags::PassiveEffect == Flags::NoFlags))
+        {
+            return;
+        }
+
+        let update_queue = &finished_work_b.update_queue;
+        if update_queue.is_some() {
+            let update_queue = update_queue.clone().unwrap();
+            if (update_queue.borrow().last_effect.is_none()) {
+                log!("When FC has PassiveEffect, the effect should exist.")
+            }
+            if _type == "unmount" {
+                root.borrow()
+                    .pending_passive_effects
+                    .borrow_mut()
+                    .unmount
+                    .push(update_queue.borrow().last_effect.clone().unwrap());
+            } else {
+                root.borrow()
+                    .pending_passive_effects
+                    .borrow_mut()
+                    .update
+                    .push(update_queue.borrow().last_effect.clone().unwrap());
+            }
+        }
+    }
+
+    pub fn commit_hook_effect_list(
+        flags: Flags,
+        last_effect: Rc<RefCell<Effect>>,
+        callback: fn(effect: Rc<RefCell<Effect>>),
+    ) {
+        let mut effect = last_effect.borrow().next.clone();
+        loop {
+            let mut effect_rc = effect.clone().unwrap();
+            if effect_rc.borrow().tag.clone() & flags.clone() == flags.clone() {
+                callback(effect_rc.clone())
+            }
+            effect = effect_rc.borrow().next.clone();
+            if Rc::ptr_eq(
+                &effect.clone().unwrap(),
+                last_effect.borrow().next.as_ref().unwrap(),
+            ) {
+                break;
+            }
+        }
+    }
+    pub fn commit_hook_effect_list_destroy(flags: Flags, last_effect: Rc<RefCell<Effect>>) {
+        CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
+            let destroy = &effect.borrow().destroy;
+            if destroy.is_function() {
+                destroy.call0(&JsValue::null());
+            }
+            effect.borrow_mut().tag &= !Flags::HookHasEffect;
+        });
+    }
+
+    pub fn commit_hook_effect_list_unmount(flags: Flags, last_effect: Rc<RefCell<Effect>>) {
+        CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
+            let destroy = &effect.borrow().destroy;
+            if destroy.is_function() {
+                destroy.call0(&JsValue::null());
+            }
+        });
+    }
+
+    pub fn commit_hook_effect_list_mount(flags: Flags, last_effect: Rc<RefCell<Effect>>) {
+        CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
+            let create = &effect.borrow().create;
+            if create.is_function() {
+                let destroy = create.call0(&JsValue::null()).unwrap();
+                effect.borrow_mut().destroy = Function::from(destroy.clone());
+            }
+        });
+    }
+
+    pub fn commit_mutation_effects(
+        &mut self,
+        finished_work: Rc<RefCell<FiberNode>>,
+        root: Rc<RefCell<FiberRootNode>>,
+    ) {
         self.next_effect = Some(finished_work);
         while self.next_effect.is_some() {
             let next_effect = self.next_effect.clone().unwrap().clone();
             let child = next_effect.borrow().child.clone();
             if child.is_some()
-                && get_mutation_mask().contains(next_effect.borrow().subtree_flags.clone())
+                && next_effect.borrow().subtree_flags.clone()
+                & (get_mutation_mask() | get_passive_mask())
+                != Flags::NoFlags
             {
                 self.next_effect = child;
             } else {
                 while self.next_effect.is_some() {
-                    self.commit_mutation_effects_on_fiber(self.next_effect.clone().unwrap());
+                    self.commit_mutation_effects_on_fiber(
+                        self.next_effect.clone().unwrap(),
+                        root.clone(),
+                    );
                     let sibling = self
                         .next_effect
                         .clone()
@@ -66,7 +164,11 @@ impl CommitWork {
         }
     }
 
-    fn commit_mutation_effects_on_fiber(&self, finished_work: Rc<RefCell<FiberNode>>) {
+    fn commit_mutation_effects_on_fiber(
+        &self,
+        finished_work: Rc<RefCell<FiberNode>>,
+        root: Rc<RefCell<FiberRootNode>>,
+    ) {
         let flags = finished_work.borrow().flags.clone();
         if flags.contains(Flags::Placement) {
             self.commit_placement(finished_work.clone());
@@ -78,7 +180,7 @@ impl CommitWork {
                 let deletions = &finished_work.borrow().deletions;
                 if !deletions.is_empty() {
                     for child_to_delete in deletions {
-                        self.commit_deletion(child_to_delete.clone());
+                        self.commit_deletion(child_to_delete.clone(), root.clone());
                     }
                 }
             }
@@ -89,6 +191,11 @@ impl CommitWork {
         if flags.contains(Flags::Update) {
             self.commit_update(finished_work.clone());
             finished_work.borrow_mut().flags -= Flags::Update;
+        }
+
+        if flags & Flags::PassiveEffect != Flags::NoFlags {
+            CommitWork::commit_passive_effect(finished_work.clone(), root, "update");
+            finished_work.borrow_mut().flags -= Flags::PassiveEffect;
         }
     }
 
@@ -107,13 +214,19 @@ impl CommitWork {
         };
     }
 
-    fn commit_deletion(&self, child_to_delete: Rc<RefCell<FiberNode>>) {
+    fn commit_deletion(
+        &self,
+        child_to_delete: Rc<RefCell<FiberNode>>,
+        root: Rc<RefCell<FiberRootNode>>,
+    ) {
         let first_host_fiber: Rc<RefCell<Option<Rc<RefCell<FiberNode>>>>> =
             Rc::new(RefCell::new(None));
         self.commit_nested_unmounts(child_to_delete.clone(), |unmount_fiber| {
             let cloned = first_host_fiber.clone();
             match unmount_fiber.borrow().tag {
-                WorkTag::FunctionComponent => {}
+                WorkTag::FunctionComponent => {
+                    CommitWork::commit_passive_effect(unmount_fiber.clone(), root.clone(), "unmount");
+                }
                 WorkTag::HostRoot => {}
                 WorkTag::HostComponent => {
                     if cloned.borrow().is_none() {

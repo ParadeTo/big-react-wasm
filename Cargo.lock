@@ -521,6 +521,7 @@ dependencies = [
  "bitflags",
  "console_error_panic_hook",
  "react",
+ "scheduler",
  "shared",
  "wasm-bindgen",
  "wasm-bindgen-test",
