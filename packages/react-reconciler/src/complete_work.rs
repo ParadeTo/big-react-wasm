@@ -76,18 +76,18 @@ impl CompleteWork {
             }
 
             {
-                node.clone()
-                    .unwrap()
-                    .borrow()
+                let node = node.clone().unwrap();
+                let _return = { node.borrow()._return.clone() };
+                node.borrow()
                     .sibling
                     .clone()
                     .unwrap()
                     .clone()
                     .borrow_mut()
-                    ._return = node_unwrap.borrow()._return.clone();
+                    ._return = _return;
             }
 
-            node = node.clone().unwrap().borrow().sibling.clone();
+            node = { node.clone().unwrap().borrow().sibling.clone() };
         }
     }
 

@@ -86,7 +86,10 @@ impl CommitWork {
         CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
             let destroy = { effect.borrow().destroy.clone() };
             if destroy.is_function() {
-                destroy.dyn_ref::<Function>().unwrap().call0(&JsValue::null());
+                destroy
+                    .dyn_ref::<Function>()
+                    .unwrap()
+                    .call0(&JsValue::null());
             }
             effect.borrow_mut().tag &= !Flags::HookHasEffect;
         });
@@ -96,7 +99,10 @@ impl CommitWork {
         CommitWork::commit_hook_effect_list(flags, last_effect, |effect: Rc<RefCell<Effect>>| {
             let destroy = &effect.borrow().destroy;
             if destroy.is_function() {
-                destroy.dyn_ref::<Function>().unwrap().call0(&JsValue::null());
+                destroy
+                    .dyn_ref::<Function>()
+                    .unwrap()
+                    .call0(&JsValue::null());
             }
         });
     }
@@ -207,7 +213,7 @@ impl CommitWork {
                 let state_node = FiberNode::derive_state_node(finished_work.clone());
                 if let Some(state_node) = state_node.clone() {
                     self.host_config
-                        .commit_text_update(state_node.clone(), new_content.as_string().unwrap())
+                        .commit_text_update(state_node.clone(), &new_content)
                 }
             }
             _ => log!("commit_update, unsupported type"),
@@ -225,7 +231,11 @@ impl CommitWork {
             let cloned = first_host_fiber.clone();
             match unmount_fiber.borrow().tag {
                 WorkTag::FunctionComponent => {
-                    CommitWork::commit_passive_effect(unmount_fiber.clone(), root.clone(), "unmount");
+                    CommitWork::commit_passive_effect(
+                        unmount_fiber.clone(),
+                        root.clone(),
+                        "unmount",
+                    );
                 }
                 WorkTag::HostRoot => {}
                 WorkTag::HostComponent => {

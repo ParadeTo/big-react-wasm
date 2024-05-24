@@ -37,7 +37,7 @@ pub trait HostConfig {
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>);
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>);
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>);
-    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String);
+    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue);
     fn insert_child_to_container(
         &self,
         child: Rc<dyn Any>,

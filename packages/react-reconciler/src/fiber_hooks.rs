@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen::prelude::{Closure, wasm_bindgen};
-use web_sys::js_sys::{Function, Object, Reflect};
+use web_sys::js_sys::{Array, Function, Object, Reflect};
 
 use shared::log;
 
@@ -304,7 +304,6 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     let queue = hook_cloned.borrow().update_queue.clone();
     let base_state = hook_cloned.borrow().memoized_state.clone();
 
-    // Todo update when render
     unsafe {
         hook_cloned.borrow_mut().memoized_state = process_update_queue(
             base_state,
@@ -313,7 +312,6 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
             RENDER_LANE.clone(),
         );
     }
-    log!("memoized_state {:?}", hook_cloned.borrow().memoized_state);
 
     Ok(vec![
         hook.clone()
@@ -401,9 +399,65 @@ fn mount_effect(create: Function, deps: JsValue) {
             JsValue::null(),
             next_deps,
         )));
-
-    // let next_deps = deps.is_undefined() ?
-    // log!("create {:?}", create);
 }
 
-fn update_effect(create: Function, deps: JsValue) {}
+fn update_effect(create: Function, deps: JsValue) {
+    let hook = update_work_in_progress_hook();
+    let next_deps = if deps.is_undefined() {
+        JsValue::null()
+    } else {
+        deps
+    };
+
+    let mut destroy = JsValue::null();
+    unsafe {
+        if CURRENT_HOOK.is_some() {
+            let current_hook = CURRENT_HOOK.clone().unwrap();
+            let prev_effect = current_hook.borrow().memoized_state.clone();
+            if let MemoizedState::Effect(prev_effect) = prev_effect.unwrap() {
+                destroy = prev_effect.borrow().destroy.clone();
+                if !next_deps.is_null() {
+                    let prev_deps = prev_effect.borrow().deps.clone();
+
+                    if are_hook_inputs_equal(&prev_deps, &next_deps) {
+                        hook.as_ref().unwrap().borrow_mut().memoized_state =
+                            Some(MemoizedState::Effect(push_effect(Flags::Passive, create, destroy, next_deps)));
+                        return;
+                    }
+                }
+            } else {
+                panic!("memoized_state is not Effect")
+            }
+        }
+
+        CURRENTLY_RENDERING_FIBER.as_ref().unwrap().borrow_mut().flags |= Flags::PassiveEffect;
+        log!("CURRENTLY_RENDERING_FIBER.as_ref().unwrap().borrow_mut()");
+
+        hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+            Some(MemoizedState::Effect(push_effect(
+                Flags::Passive | Flags::HookHasEffect,
+                create,
+                destroy.clone(),
+                next_deps,
+            )));
+    }
+}
+
+fn are_hook_inputs_equal(next_deps: &JsValue, pre_deps: &JsValue) -> bool {
+    if next_deps.is_null() || pre_deps.is_null() {
+        return false;
+    }
+
+    let next_deps = next_deps.dyn_ref::<Array>().unwrap();
+    let pre_deps = pre_deps.dyn_ref::<Array>().unwrap();
+
+    let len = next_deps.length();
+
+    for i in 0..len {
+        if Object::is(&pre_deps.get(i), &next_deps.get(i)) {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}

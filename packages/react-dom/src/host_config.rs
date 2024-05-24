@@ -112,9 +112,9 @@ impl HostConfig for ReactDomHostConfig {
         }
     }
 
-    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: String) {
+    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue) {
         let text_instance = text_instance.clone().downcast::<Node>().unwrap();
-        text_instance.set_node_value(Some(content.as_str()));
+        text_instance.set_node_value(Some(to_string(content).as_str()));
     }
 
     fn insert_child_to_container(
