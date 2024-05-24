@@ -208,9 +208,9 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
 
     let subtree_flags = finished_work.borrow().subtree_flags.clone();
     let flags = finished_work.borrow().flags.clone();
+    
     // useEffect
     let root_cloned = root.clone();
-    log!("flags {:?} {:?}", flags, subtree_flags);
     let passive_mask = get_passive_mask();
     if flags.clone() & passive_mask.clone() != Flags::NoFlags
         || subtree_flags.clone() & passive_mask != Flags::NoFlags
