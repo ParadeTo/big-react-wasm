@@ -48,7 +48,7 @@ pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, mut update: Update
         update_rc.borrow_mut().next = update_option.clone();
     } else {
         let pending = pending.clone().unwrap();
-        update_rc.borrow_mut().next = { pending.borrow().next.clone() };
+        update_rc.borrow_mut().next = pending.borrow().next.clone();
         pending.borrow_mut().next = update_option.clone();
     }
     update_queue.borrow_mut().shared.pending = update_option.clone();

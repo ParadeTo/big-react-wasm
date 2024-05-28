@@ -49,7 +49,7 @@ fn delete_child(
         return_fiber.borrow_mut().deletions = vec![child_to_delete.clone()];
         return_fiber.borrow_mut().flags |= Flags::ChildDeletion;
     } else {
-        let mut del = &mut return_fiber.borrow_mut().deletions;
+        let del = &mut return_fiber.borrow_mut().deletions;
         del.push(child_to_delete.clone());
     }
 }

@@ -87,7 +87,7 @@ impl CompleteWork {
                     ._return = _return;
             }
 
-            node = { node.clone().unwrap().borrow().sibling.clone() };
+            node = node.clone().unwrap().borrow().sibling.clone();
         }
     }
 

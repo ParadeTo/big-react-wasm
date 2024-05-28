@@ -43,7 +43,7 @@ impl CommitWork {
         let update_queue = &finished_work_b.update_queue;
         if update_queue.is_some() {
             let update_queue = update_queue.clone().unwrap();
-            if (update_queue.borrow().last_effect.is_none()) {
+            if update_queue.borrow().last_effect.is_none() {
                 log!("When FC has PassiveEffect, the effect should exist.")
             }
             if _type == "unmount" {
