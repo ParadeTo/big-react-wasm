@@ -19,6 +19,6 @@ pub fn create_root() -> Renderer {
     let container = create_container();
     let reconciler = Reconciler::new(Rc::new(ReactNoopHostConfig));
     let root = reconciler.create_container(Rc::new(container.clone()));
-    let renderer = Renderer::new(root, reconciler);
+    let renderer = Renderer::new(root, reconciler, container);
     renderer
 }

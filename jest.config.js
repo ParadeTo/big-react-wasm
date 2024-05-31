@@ -5,5 +5,5 @@ module.exports = {
     moduleDirectories: [...defaults.moduleDirectories, 'dist'],
     modulePathIgnorePatterns: ["__tests__/utils"],
     testEnvironment: 'jsdom',
-    setupFilesAfterEnv: ['<rootDir>/setup-jest.js'],
+    setupFilesAfterEnv: ['<rootDir>/jest/setupJest.js'],
 };

@@ -24,13 +24,12 @@ if (isTest) {
             isTest ? '--target nodejs' : ''
         }`
     )
-} else {
-    execSync(
-        `wasm-pack build packages/react-dom --out-dir ${cwd}/dist/react-dom --out-name index ${
-            isTest ? '--target nodejs' : ''
-        }`
-    )
 }
+execSync(
+    `wasm-pack build packages/react-noop --out-dir ${cwd}/dist/react-dom --out-name index ${
+        isTest ? '--target nodejs' : ''
+    }`
+)
 
 
 // modify react/package.json
@@ -59,17 +58,17 @@ if (isTest) {
             : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
     )
 
-} else {
-    // modify react-dom/index_bg.js
-    const reactDomIndexFilename = isTest
-        ? `${cwd}/dist/react-dom/index.js`
-        : `${cwd}/dist/react-dom/index_bg.js`
-    const reactDomIndexBgData = fs.readFileSync(reactDomIndexFilename)
-    fs.writeFileSync(
-        reactDomIndexFilename,
-        (isTest
-            ? 'const {updateDispatcher} = require("react");\n'
-            : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
-    )
-
 }
+// modify react-dom/index_bg.js
+const reactDomIndexFilename = isTest
+    ? `${cwd}/dist/react-dom/index.js`
+    : `${cwd}/dist/react-dom/index_bg.js`
+const reactDomIndexBgData = fs.readFileSync(reactDomIndexFilename)
+fs.writeFileSync(
+    reactDomIndexFilename,
+    (isTest
+        ? 'const {updateDispatcher} = require("react");\n'
+        : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
+)
+
+

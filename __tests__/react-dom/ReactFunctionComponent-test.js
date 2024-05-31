@@ -65,6 +65,7 @@ describe('ReactFunctionComponent', () => {
         }).not.toThrowError();
     });
 
+
     // it('should throw on string refs in pure functions', () => {
     //   function Child() {
     //     return <div ref="me" />;
