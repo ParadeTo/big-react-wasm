@@ -1,13 +1,16 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use wasm_bindgen::JsValue;
+use shared::REACT_ELEMENT_TYPE;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsValue;
 use web_sys::js_sys::Array;
 
 use react_reconciler::fiber::FiberRootNode;
 use react_reconciler::Reconciler;
 use shared::{derive_from_js_value, to_string, type_of};
+use web_sys::js_sys::Object;
+use web_sys::js_sys::Reflect;
 
 #[wasm_bindgen]
 pub struct Renderer {
@@ -74,7 +77,17 @@ fn child_to_jsx(child: JsValue) -> JsValue {
     if children.is_array() {
         let childrenChildren = child_to_jsx(children);
         let props = derive_from_js_value(&child, "props");
-        todo!("instance")
+        if (!childrenChildren.is_null()) {
+            Reflect::set(&props, &"children".into(), &childrenChildren);
+        }
+
+        let obj = Object::new();
+        Reflect::set(&obj, &"$$typeof".into(), &REACT_ELEMENT_TYPE.into());
+        Reflect::set(&obj, &"type".into(), &derive_from_js_value(&child, "type"));
+        Reflect::set(&obj, &"key".into(), &JsValue::null());
+        Reflect::set(&obj, &"ref".into(), &JsValue::null());
+        Reflect::set(&obj, &"props".into(), &props);
+        return obj.into();
     }
 
     derive_from_js_value(&child, "text")
@@ -88,6 +101,18 @@ impl Renderer {
     }
 
     pub fn getChildrenAsJSX(&self) -> JsValue {
-        child_to_jsx(self.container.clone())
+        let mut children = derive_from_js_value(&self.container, "children");
+        if children.is_undefined() {
+            children = JsValue::null();
+        }
+        children = child_to_jsx(children);
+
+        if children.is_null() {
+            return JsValue::null();
+        }
+        if children.is_array() {
+            todo!("Fragment")
+        }
+        return children;
     }
 }

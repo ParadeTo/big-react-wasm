@@ -2,11 +2,11 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsValue;
 use web_sys::js_sys;
-use web_sys::js_sys::{Array, Function, global, Object, Promise, Reflect};
 use web_sys::js_sys::JSON::stringify;
+use web_sys::js_sys::{global, Array, Function, Object, Promise, Reflect};
 
 use react_reconciler::HostConfig;
 use shared::{derive_from_js_value, log};
@@ -84,14 +84,18 @@ impl HostConfig for ReactNoopHostConfig {
         Reflect::set(&obj, &"type".into(), &_type.into());
         Reflect::set(&obj, &"children".into(), &**Array::new());
         Reflect::set(&obj, &"parent".into(), &JsValue::from(-1.0));
-        Reflect::set(&obj, &"props".into(), &*props.clone().downcast::<JsValue>().unwrap());
+        Reflect::set(
+            &obj,
+            &"props".into(),
+            &*props.clone().downcast::<JsValue>().unwrap(),
+        );
         Rc::new(JsValue::from(obj))
     }
 
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>) {
         let p = parent.clone().downcast::<JsValue>().unwrap();
         let c = child.clone().downcast::<JsValue>().unwrap();
-        log!("{:?} {:?}", p, c);
+        log!("append_initial_child {:?} {:?}", p, c);
         let prev_parent = derive_from_js_value(&c, "parent").as_f64().unwrap();
         let parent_id = derive_from_js_value(&p, "id").as_f64().unwrap();
         if prev_parent != -1.0 && prev_parent != parent_id {
@@ -106,6 +110,7 @@ impl HostConfig for ReactNoopHostConfig {
     fn append_child_to_container(&self, child: Rc<dyn Any>, container: Rc<dyn Any>) {
         let container = container.clone().downcast::<JsValue>().unwrap();
         let c = child.clone().downcast::<JsValue>().unwrap();
+        log!("append_child_to_container {:?} {:?}", container, c);
         let prev_parent = derive_from_js_value(&c, "parent").as_f64().unwrap();
         let root_id = derive_from_js_value(&container, "rootId").as_f64().unwrap();
         if prev_parent != -1.0 && prev_parent != root_id {
@@ -119,6 +124,7 @@ impl HostConfig for ReactNoopHostConfig {
             children.splice(index as u32, 1, &JsValue::undefined());
         }
         children.push(&c);
+        log!("append_child_to_container {:?} {:?}", container, c);
     }
 
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>) {
@@ -138,7 +144,12 @@ impl HostConfig for ReactNoopHostConfig {
         Reflect::set(&text_instance, &"text".into(), content);
     }
 
-    fn insert_child_to_container(&self, child: Rc<dyn Any>, container: Rc<dyn Any>, before: Rc<dyn Any>) {
+    fn insert_child_to_container(
+        &self,
+        child: Rc<dyn Any>,
+        container: Rc<dyn Any>,
+        before: Rc<dyn Any>,
+    ) {
         let container = container.clone().downcast::<JsValue>().unwrap();
         let child = child.clone().downcast::<JsValue>().unwrap();
         let children_js_value = derive_from_js_value(&container, "children");
@@ -165,7 +176,14 @@ impl HostConfig for ReactNoopHostConfig {
             .is_function()
         {
             let closure_clone = closure.clone();
-            queueMicrotask(&closure_clone.borrow_mut().as_ref().unwrap().as_ref().unchecked_ref::<JsValue>());
+            queueMicrotask(
+                &closure_clone
+                    .borrow_mut()
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unchecked_ref::<JsValue>(),
+            );
             closure_clone.borrow_mut().take().unwrap_throw().forget();
         } else if js_sys::Reflect::get(&*global(), &JsValue::from_str("Promise"))
             .map(|value| value.is_function())
@@ -182,7 +200,15 @@ impl HostConfig for ReactNoopHostConfig {
             c.forget();
         } else {
             let closure_clone = closure.clone();
-            setTimeout(&closure_clone.borrow_mut().as_ref().unwrap().as_ref().unchecked_ref::<JsValue>(), 0);
+            setTimeout(
+                &closure_clone
+                    .borrow_mut()
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unchecked_ref::<JsValue>(),
+                0,
+            );
             closure_clone.borrow_mut().take().unwrap_throw().forget();
         }
     }
