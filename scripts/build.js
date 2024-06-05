@@ -50,14 +50,15 @@ if (isTest) {
   const reactNoopIndexFilename = isTest
     ? `${cwd}/dist/react-noop/index.js`
     : `${cwd}/dist/react-noop/index_bg.js`
-  const reactDomIndexBgData = fs.readFileSync(reactNoopIndexFilename)
+  const reactNoopIndexBgData = fs.readFileSync(reactNoopIndexFilename)
   fs.writeFileSync(
     reactNoopIndexFilename,
     (isTest
       ? 'const {updateDispatcher} = require("react");\n'
-      : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
+      : 'import {updateDispatcher} from "react";\n') + reactNoopIndexBgData
   )
 }
+
 // modify react-dom/index_bg.js
 const reactDomIndexFilename = isTest
   ? `${cwd}/dist/react-dom/index.js`

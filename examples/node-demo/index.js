@@ -10,24 +10,35 @@ function sleep(ms) {
   })
 }
 
-async function run() {
+async function test1() {
+  const arr = []
+
   function Parent() {
     useEffect(() => {
-      return () => console.log('Unmount parent')
+      return () => arr.push('Unmount parent')
     })
     return <Child />
   }
 
   function Child() {
     useEffect(() => {
-      return () => console.log('Unmount child')
+      return () => arr.push('Unmount child')
     })
     return 'Child'
   }
 
   root.render(<Parent a={1} />)
-  await sleep(1000)
+  await sleep(10)
+  if (root.getChildrenAsJSX() !== 'Child') {
+    throw new Error('test1 failed')
+  }
+
+  root.render(<div>a</div>)
+  await sleep(10)
   console.log(root.getChildrenAsJSX())
+  // if (root.getChildrenAsJSX() !== null) {
+  //   throw new Error('test1 failed')
+  // }
 }
 
-run()
+test1()

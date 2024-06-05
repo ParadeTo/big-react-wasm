@@ -14,7 +14,7 @@ describe('ReactHooksWithNoopRenderer', () => {
     jest.resetModules()
 
     React = require('../../dist/react')
-    act = require('jest-react').act
+    // act = require('jest-react').act
     // Scheduler = require('scheduler/unstable_mock');
     ReactNoop = require('../../dist/react-noop')
 
@@ -22,6 +22,7 @@ describe('ReactHooksWithNoopRenderer', () => {
   })
 
   it.only('passive unmounts on deletion are fired in parent -> child order', async () => {
+    console.log(queueMicrotask)
     const root = ReactNoop.createRoot()
 
     function Parent() {
@@ -38,8 +39,10 @@ describe('ReactHooksWithNoopRenderer', () => {
       return 'Child'
     }
 
+    console.log(<Parent />)
     root.render(<Parent />)
-    await sleep(10)
+    await sleep(1000)
+    console.log(root.getChildrenAsJSX())
     expect(root).toMatchRenderedOutput('Child')
     // expect(1).toBe(1)
     // await act(async () => {
