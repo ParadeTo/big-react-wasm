@@ -15,14 +15,18 @@ async function test1() {
 
   function Parent() {
     useEffect(() => {
-      return () => arr.push('Unmount parent')
+      return () => {
+        arr.push('Unmount parent')
+      }
     })
     return <Child />
   }
 
   function Child() {
     useEffect(() => {
-      return () => arr.push('Unmount child')
+      return () => {
+        arr.push('Unmount child')
+      }
     })
     return 'Child'
   }
@@ -33,12 +37,11 @@ async function test1() {
     throw new Error('test1 failed')
   }
 
-  root.render(<div>a</div>)
+  root.render(null)
   await sleep(10)
-  console.log(root.getChildrenAsJSX())
-  // if (root.getChildrenAsJSX() !== null) {
-  //   throw new Error('test1 failed')
-  // }
+  if (arr.join('') !== 'Unmount parentUnmount child') {
+    throw new Error('test1 failed')
+  }
 }
 
 test1()

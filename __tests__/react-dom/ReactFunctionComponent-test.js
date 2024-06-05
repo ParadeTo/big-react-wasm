@@ -39,18 +39,21 @@ describe('ReactFunctionComponent', () => {
     expect(el.textContent).toBe('A')
   })
 
-  // it('should update stateless component', () => {
-  // 	function Parent(props) {
-  // 		return <FunctionComponent {...props} />;
-  // 	}
+  it('should update stateless component', async () => {
+    function Parent(props) {
+      return <FunctionComponent {...props} />
+    }
 
-  // 	const el = document.createElement('div');
-  // 	ReactDOM.createRoot(el).render(<Parent name="A" />);
-  // 	expect(el.textContent).toBe('A');
+    let el = document.createElement('div')
+    ReactDOM.createRoot(el).render(<Parent name='A' />)
+    await sleep(10)
+    expect(el.textContent).toBe('A')
 
-  // 	ReactDOM.createRoot(el).render(<Parent name="B" />);
-  // 	expect(el.textContent).toBe('B');
-  // });
+    el = document.createElement('div')
+    ReactDOM.createRoot(el).render(<Parent name='B' />)
+    await sleep(10)
+    expect(el.textContent).toBe('B')
+  })
 
   it('should not throw when stateless component returns undefined', () => {
     function NotAComponent() {}

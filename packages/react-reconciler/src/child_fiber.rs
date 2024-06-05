@@ -6,7 +6,7 @@ use std::rc::Rc;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Array, Object, Reflect};
 
-use shared::{derive_from_js_value, log, REACT_ELEMENT_TYPE, type_of};
+use shared::{derive_from_js_value, log, type_of, REACT_ELEMENT_TYPE};
 
 use crate::fiber::FiberNode;
 use crate::fiber_flags::Flags;
@@ -58,9 +58,9 @@ fn delete_remaining_children(
     return_fiber: Rc<RefCell<FiberNode>>,
     current_first_child: Option<Rc<RefCell<FiberNode>>>,
     should_track_effects: bool,
-) {
+) -> Option<Rc<RefCell<FiberNode>>> {
     if !should_track_effects {
-        return;
+        return None;
     }
 
     let mut child_to_delete = current_first_child;
@@ -78,6 +78,8 @@ fn delete_remaining_children(
             .sibling
             .clone();
     }
+
+    return None;
 }
 
 fn reconcile_single_element(
@@ -226,7 +228,9 @@ fn update_from_map(
                 delete_child(return_fiber, before, should_track_effects);
             }
         }
-        return if type_of(element, "null") { None } else {
+        return if type_of(element, "null") {
+            None
+        } else {
             Some(Rc::new(RefCell::new(FiberNode::new(
                 WorkTag::HostText,
                 props.clone(),
@@ -245,13 +249,18 @@ fn update_from_map(
                 &before.borrow()._type,
                 &derive_from_js_value(&(*element).clone(), "type"),
             ) {
-                return Some(use_fiber(before.clone(), derive_from_js_value(element, "props")));
+                return Some(use_fiber(
+                    before.clone(),
+                    derive_from_js_value(element, "props"),
+                ));
             } else {
                 delete_child(return_fiber, before, should_track_effects);
             }
         }
 
-        return Some(Rc::new(RefCell::new(FiberNode::create_fiber_from_element(element))));
+        return Some(Rc::new(RefCell::new(FiberNode::create_fiber_from_element(
+            element,
+        ))));
     }
     // panic!("update_from_map unsupported");
     None
@@ -379,8 +388,8 @@ fn _reconcile_child_fibers(
             }
         }
     }
-    log!("Unsupported child type when reconcile");
-    None
+
+    delete_remaining_children(return_fiber, current_first_child, should_track_effects)
 }
 
 pub fn reconcile_child_fibers(
