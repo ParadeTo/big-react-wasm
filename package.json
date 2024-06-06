@@ -9,7 +9,8 @@
   "scripts": {
     "build:dev": "ENV=dev node scripts/build.js",
     "build:test": "ENV=test node scripts/build.js --test",
-    "test": "npm run build:test && jest"
+    "test": "npm run build:test && jest",
+    "jest": "jest --watch"
   },
   "author": "",
   "license": "ISC",
@@ -23,5 +24,8 @@
     "jest-environment-jsdom": "^29.7.0",
     "react": "file://./dist/react",
     "react-dom": "file://./dist/react-dom"
+  },
+  "dependencies": {
+    "jest-react": "^0.14.2"
   }
 }

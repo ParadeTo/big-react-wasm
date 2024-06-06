@@ -1,3 +1,4 @@
+use web_sys::js_sys::JSON::stringify;
 use web_sys::js_sys::Reflect;
 use web_sys::wasm_bindgen::JsValue;
 
@@ -44,4 +45,23 @@ pub fn type_of(val: &JsValue, _type: &str) -> bool {
         "unknown".to_string()
     };
     t == _type
+}
+
+pub fn to_string(js_value: &JsValue) -> String {
+    js_value.as_string().unwrap_or_else(|| {
+        if js_value.is_undefined() {
+            "undefined".to_owned()
+        } else if js_value.is_null() {
+            "null".to_owned()
+        } else if type_of(js_value, "boolean") {
+            let bool_value = js_value.as_bool().unwrap();
+            bool_value.to_string()
+        } else if js_value.as_f64().is_some() {
+            let num_value = js_value.as_f64().unwrap();
+            num_value.to_string()
+        } else {
+            let js_string = stringify(&js_value).unwrap();
+            js_string.into()
+        }
+    })
 }
