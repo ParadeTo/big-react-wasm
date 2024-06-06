@@ -39,7 +39,7 @@ async function test1() {
 
   root.render(null)
   await sleep(10)
-  if (arr.join('') !== 'Unmount parentUnmount child') {
+  if (arr.join(',') !== 'Unmount parent,Unmount child') {
     throw new Error('test1 failed')
   }
 }

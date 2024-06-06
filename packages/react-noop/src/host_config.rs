@@ -95,7 +95,6 @@ impl HostConfig for ReactNoopHostConfig {
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>) {
         let p = parent.clone().downcast::<JsValue>().unwrap();
         let c = child.clone().downcast::<JsValue>().unwrap();
-        log!("append_initial_child {:?} {:?}", p, c);
         let prev_parent = derive_from_js_value(&c, "parent").as_f64().unwrap();
         let parent_id = derive_from_js_value(&p, "id").as_f64().unwrap();
         if prev_parent != -1.0 && prev_parent != parent_id {
@@ -110,7 +109,6 @@ impl HostConfig for ReactNoopHostConfig {
     fn append_child_to_container(&self, child: Rc<dyn Any>, container: Rc<dyn Any>) {
         let container = container.clone().downcast::<JsValue>().unwrap();
         let c = child.clone().downcast::<JsValue>().unwrap();
-        log!("append_child_to_container {:?} {:?}", container, c);
         let prev_parent = derive_from_js_value(&c, "parent").as_f64().unwrap();
         let root_id = derive_from_js_value(&container, "rootId").as_f64().unwrap();
         if prev_parent != -1.0 && prev_parent != root_id {
@@ -124,7 +122,6 @@ impl HostConfig for ReactNoopHostConfig {
             children.splice(index as u32, 1, &JsValue::undefined());
         }
         children.push(&c);
-        log!("append_child_to_container {:?} {:?}", container, c);
     }
 
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>) {
