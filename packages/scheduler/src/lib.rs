@@ -2,8 +2,8 @@ use std::any::Any;
 use std::cmp::{Ordering, PartialEq};
 
 use wasm_bindgen::prelude::*;
+use web_sys::js_sys::{global, Function};
 use web_sys::{MessageChannel, MessagePort};
-use web_sys::js_sys::{Function, global};
 
 use crate::heap::{peek, peek_mut, pop, push};
 
@@ -58,8 +58,8 @@ extern "C" {
 }
 
 #[derive(Clone, Debug)]
-struct Task {
-    id: u32,
+pub struct Task {
+    pub id: u32,
     callback: JsValue,
     priority_level: Priority,
     start_time: f64,
@@ -327,9 +327,7 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValu
                 } else {
                     if match peek(&TASK_QUEUE) {
                         None => false,
-                        Some(task) => {
-                            task == t
-                        }
+                        Some(task) => task == t,
                     } {
                         pop(&mut TASK_QUEUE);
                     }
@@ -403,7 +401,8 @@ fn request_host_timeout(callback: fn(f64), ms: f64) {
     }
 }
 
-pub fn unstable_cancel_callback(id: u32) {
+pub fn unstable_cancel_callback(task: Task) {
+    let id = task.id;
     unsafe {
         for mut task in &mut TASK_QUEUE {
             if task.id == id {
@@ -419,7 +418,11 @@ pub fn unstable_cancel_callback(id: u32) {
     }
 }
 
-pub fn unstable_schedule_callback(priority_level: Priority, callback: Function, delay: f64) -> u32 {
+pub fn unstable_schedule_callback(
+    priority_level: Priority,
+    callback: Function,
+    delay: f64,
+) -> Task {
     let current_time = unstable_now();
     let mut start_time = current_time;
 
@@ -435,7 +438,7 @@ pub fn unstable_schedule_callback(priority_level: Priority, callback: Function, 
         start_time,
         expiration_time,
     );
-    let id = new_task.id;
+    let cloned = new_task.clone();
     unsafe {
         if start_time > current_time {
             new_task.sort_index = start_time;
@@ -464,9 +467,13 @@ pub fn unstable_schedule_callback(priority_level: Priority, callback: Function, 
         }
     }
 
-    id
+    cloned
 }
 
-pub fn unstable_schedule_callback_no_delay(priority_level: Priority, callback: Function) -> u32 {
+pub fn unstable_schedule_callback_no_delay(priority_level: Priority, callback: Function) -> Task {
     unstable_schedule_callback(priority_level, callback, 0.0)
+}
+
+pub fn unstable_get_current_priority_level() -> Priority {
+    unsafe { CURRENT_PRIORITY_LEVEL.clone() }
 }

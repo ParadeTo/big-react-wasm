@@ -2,21 +2,24 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bitflags::bitflags;
-use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen::closure::Closure;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::Function;
 
-use scheduler::{Priority, unstable_schedule_callback_no_delay};
+use scheduler::{
+    unstable_cancel_callback, unstable_schedule_callback_no_delay, unstable_should_yield_to_host,
+    Priority,
+};
 use shared::{is_dev, log};
 
-use crate::{COMMIT_WORK, COMPLETE_WORK, HOST_CONFIG, HostConfig};
 use crate::begin_work::begin_work;
 use crate::commit_work::CommitWork;
 use crate::fiber::{FiberNode, FiberRootNode, PendingPassiveEffects, StateNode};
-use crate::fiber_flags::{Flags, get_mutation_mask, get_passive_mask};
-use crate::fiber_lanes::{get_highest_priority, Lane, merge_lanes};
+use crate::fiber_flags::{get_mutation_mask, get_passive_mask, Flags};
+use crate::fiber_lanes::{get_highest_priority, lanes_to_scheduler_priority, merge_lanes, Lane};
 use crate::sync_task_queue::{flush_sync_callbacks, schedule_sync_callback};
 use crate::work_tags::WorkTag;
+use crate::{COMMIT_WORK, COMPLETE_WORK, HOST_CONFIG};
 
 bitflags! {
     #[derive(Debug, Clone)]
@@ -28,10 +31,19 @@ bitflags! {
     }
 }
 
+impl PartialEq for ExecutionContext {
+    fn eq(&self, other: &Self) -> bool {
+        self.bits() == other.bits()
+    }
+}
+
 static mut WORK_IN_PROGRESS: Option<Rc<RefCell<FiberNode>>> = None;
 static mut WORK_IN_PROGRESS_ROOT_RENDER_LANE: Lane = Lane::NoLane;
 static mut EXECUTION_CONTEXT: ExecutionContext = ExecutionContext::NoContext;
 static mut ROOT_DOES_HAVE_PASSIVE_EFFECTS: bool = false;
+
+static ROOT_INCOMPLETE: u8 = 1;
+static ROOT_COMPLETED: u8 = 2;
 
 pub fn schedule_update_on_fiber(fiber: Rc<RefCell<FiberNode>>, lane: Lane) {
     if is_dev() {
@@ -91,32 +103,73 @@ pub fn mark_update_lane_from_fiber_to_root(
 
 fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
     let root_cloned = root.clone();
-    let update_lane = get_highest_priority(root.borrow().pending_lanes.clone());
-    if update_lane == Lane::NoLane {
+    let update_lanes = root_cloned.borrow().get_next_lanes();
+    let existing_callback = root_cloned.borrow().callback_node.clone();
+    if update_lanes == Lane::NoLane {
+        if existing_callback.is_some() {
+            unstable_cancel_callback(existing_callback.unwrap())
+        }
+        root.borrow_mut().callback_node = None;
+        root.borrow_mut().callback_priority = Lane::NoLane;
         return;
     }
-    if update_lane == Lane::SyncLane {
+
+    let cur_priority = get_highest_priority(update_lanes.clone());
+    let prev_priority = root.borrow().callback_priority.clone();
+
+    if cur_priority == prev_priority {
+        // 有更新在进行，比较该更新与正在进行的更新的优先级
+        // 如果优先级相同，则不需要调度新的，退出调度
+        return;
+    }
+
+    if existing_callback.is_some() {
+        unstable_cancel_callback(existing_callback.unwrap())
+    }
+
+    let mut new_callback_node = None;
+    // 如果使用Scheduler调度，则会存在新的callbackNode，用React微任务调度不会存在
+    if cur_priority == Lane::SyncLane {
         if is_dev() {
-            log!("Schedule in microtask, priority {:?}", update_lane);
+            log!("Schedule in microtask, priority {:?}", update_lanes);
         }
+        schedule_sync_callback(Box::new(move || {
+            perform_sync_work_on_root(root_cloned.clone(), update_lanes.clone());
+        }));
+        unsafe {
+            HOST_CONFIG
+                .as_ref()
+                .unwrap()
+                .schedule_microtask(Box::new(|| flush_sync_callbacks()));
+        }
+    } else {
+        let scheduler_priority = lanes_to_scheduler_priority(cur_priority.clone());
+        let closure = Closure::wrap(Box::new(move |did_timeout_js_value: JsValue| {
+            let did_timeout = did_timeout_js_value.as_bool().unwrap();
+            perform_concurrent_work_on_root(root_cloned.clone(), did_timeout);
+        }) as Box<dyn Fn(JsValue)>);
+        let function = closure.as_ref().unchecked_ref::<Function>().clone();
+        closure.forget();
+        new_callback_node = Some(unstable_schedule_callback_no_delay(
+            scheduler_priority,
+            function,
+        ))
     }
-    schedule_sync_callback(Box::new(move || {
-        perform_sync_work_on_root(root_cloned.clone(), update_lane.clone());
-    }));
-    unsafe {
-        HOST_CONFIG
-            .as_ref()
-            .unwrap()
-            .schedule_microtask(Box::new(|| flush_sync_callbacks()));
-    }
+
+    root.borrow_mut().callback_node = new_callback_node;
+    root.borrow_mut().callback_priority = cur_priority;
 }
 
-fn perform_sync_work_on_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane) {
-    let next_lane = get_highest_priority(root.borrow().pending_lanes.clone());
-    log!("perform_sync_work_on_root {:?}", next_lane);
-    if next_lane != Lane::SyncLane {
-        ensure_root_is_scheduled(root.clone());
-        return;
+fn render_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane, should_time_slice: bool) -> u8 {
+    if is_dev() {
+        log!(
+            "Start {:?} render",
+            if should_time_slice {
+                "concurrent"
+            } else {
+                "sync"
+            }
+        );
     }
 
     let prev_execution_context: ExecutionContext;
@@ -125,10 +178,14 @@ fn perform_sync_work_on_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane) {
         EXECUTION_CONTEXT |= ExecutionContext::RenderContext;
     }
 
-    prepare_fresh_stack(root.clone(), lane.clone());
+    prepare_fresh_stack(root.clone(), lanes.clone());
 
     loop {
-        match work_loop() {
+        match if should_time_slice {
+            work_loop_concurrent()
+        } else {
+            work_loop_sync()
+        } {
             Ok(_) => {
                 break;
             }
@@ -142,25 +199,111 @@ fn perform_sync_work_on_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane) {
     log!("{:?}", *root.clone().borrow());
 
     unsafe {
+        if should_time_slice && WORK_IN_PROGRESS.is_some() {
+            return ROOT_INCOMPLETE;
+        }
+
+        if !should_time_slice && WORK_IN_PROGRESS.is_some() {
+            log!("The WIP is not null when render finishing")
+        }
+
         EXECUTION_CONTEXT = prev_execution_context;
         WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane;
     }
-    let finished_work = {
-        root.clone()
-            .borrow()
-            .current
-            .clone()
-            .borrow()
-            .alternate
-            .clone()
-    };
-    root.clone().borrow_mut().finished_work = finished_work;
-    root.clone().borrow_mut().finished_lane = lane;
 
-    commit_root(root);
+    ROOT_COMPLETED
 }
 
-fn flush_passive_effects(pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>) {
+fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout: bool) {
+    unsafe {
+        if EXECUTION_CONTEXT.clone()
+            & (ExecutionContext::RenderContext | ExecutionContext::CommitContext)
+            != ExecutionContext::NoContext
+        {
+            panic!("No in React work process")
+        }
+    }
+
+    // 开始执行具体工作前，保证上一次的useEffct都执行了
+    // 同时要注意useEffect执行时触发的更新优先级是否大于当前更新的优先级
+    let did_flush_passive_effects =
+        flush_passive_effects(root.borrow().pending_passive_effects.clone());
+    let cur_callback_node = root.borrow().callback_node.clone();
+
+    // 这个分支好像走不到
+    // if did_flush_passive_effects {
+    //     if root.borrow().callback_node.unwrap().id != cur_callback_node.unwrap().id {
+    //         // 调度了更高优更新，这个更新已经被取消了
+    //         return null;
+    //     }
+    // }
+
+    let lanes = root.borrow().get_next_lanes();
+    if lanes == Lane::NoLane {
+        return;
+    }
+
+    let should_time_slice = !did_timeout;
+    let exit_status = render_root(root.clone(), lanes.clone(), should_time_slice);
+
+    ensure_root_is_scheduled(root.clone());
+    if exit_status == ROOT_INCOMPLETE {
+        if root.borrow().callback_node.as_ref().unwrap().id != cur_callback_node.unwrap().id {
+            // 调度了更高优更新，这个更新已经被取消了
+            return;
+        }
+        return perform_concurrent_work_on_root(root, false);
+    }
+
+    if exit_status == ROOT_COMPLETED {
+        let finished_work = {
+            root.clone()
+                .borrow()
+                .current
+                .clone()
+                .borrow()
+                .alternate
+                .clone()
+        };
+        root.clone().borrow_mut().finished_work = finished_work;
+        root.clone().borrow_mut().finished_lanes = lanes;
+
+        commit_root(root);
+    } else {
+        todo!("Unsupported status of concurrent render")
+    }
+}
+
+fn perform_sync_work_on_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane) {
+    let next_lane = get_highest_priority(root.borrow().pending_lanes.clone());
+
+    if next_lane != Lane::SyncLane {
+        ensure_root_is_scheduled(root.clone());
+        return;
+    }
+
+    let exit_status = render_root(root.clone(), lanes.clone(), false);
+
+    if exit_status == ROOT_COMPLETED {
+        let finished_work = {
+            root.clone()
+                .borrow()
+                .current
+                .clone()
+                .borrow()
+                .alternate
+                .clone()
+        };
+        root.clone().borrow_mut().finished_work = finished_work;
+        root.clone().borrow_mut().finished_lanes = lanes;
+
+        commit_root(root);
+    } else {
+        todo!("Unsupported status of sync render")
+    }
+}
+
+fn flush_passive_effects(pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>) -> bool {
     unsafe {
         if EXECUTION_CONTEXT
             .contains(ExecutionContext::RenderContext | ExecutionContext::CommitContext)
@@ -168,24 +311,30 @@ fn flush_passive_effects(pending_passive_effects: Rc<RefCell<PendingPassiveEffec
             log!("Cannot execute useEffect callback in React work loop")
         }
 
+        let mut did_flush_passive_effects = false;
         for effect in &pending_passive_effects.borrow().unmount {
+            did_flush_passive_effects = true;
             CommitWork::commit_hook_effect_list_destroy(Flags::Passive, effect.clone());
         }
         pending_passive_effects.borrow_mut().unmount = vec![];
 
         for effect in &pending_passive_effects.borrow().update {
+            did_flush_passive_effects = true;
             CommitWork::commit_hook_effect_list_unmount(
                 Flags::Passive | Flags::HookHasEffect,
                 effect.clone(),
             );
         }
         for effect in &pending_passive_effects.borrow().update {
+            did_flush_passive_effects = true;
             CommitWork::commit_hook_effect_list_mount(
                 Flags::Passive | Flags::HookHasEffect,
                 effect.clone(),
             );
         }
         pending_passive_effects.borrow_mut().update = vec![];
+        flush_sync_callbacks();
+        did_flush_passive_effects
     }
 }
 
@@ -194,21 +343,23 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
     if cloned.borrow().finished_work.is_none() {
         return;
     }
-    let lane = root.borrow().finished_lane.clone();
+    let lanes = root.borrow().finished_lanes.clone();
 
     let finished_work = cloned.borrow().finished_work.clone().unwrap();
     cloned.borrow_mut().finished_work = None;
-    cloned.borrow_mut().finished_lane = Lane::NoLane;
+    cloned.borrow_mut().finished_lanes = Lane::NoLane;
+    cloned.borrow_mut().callback_node = None;
+    cloned.borrow_mut().callback_priority = Lane::NoLane;
 
-    cloned.borrow_mut().mark_root_finished(lane.clone());
+    cloned.borrow_mut().mark_root_finished(lanes.clone());
 
-    if lane == Lane::NoLane {
+    if lanes == Lane::NoLane {
         log!("Commit phase finished lane should not be NoLane")
     }
 
     let subtree_flags = finished_work.borrow().subtree_flags.clone();
     let flags = finished_work.borrow().flags.clone();
-    
+
     // useEffect
     let root_cloned = root.clone();
     let passive_mask = get_passive_mask();
@@ -255,6 +406,7 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
     unsafe {
         ROOT_DOES_HAVE_PASSIVE_EFFECTS = false;
     }
+    ensure_root_is_scheduled(root);
 }
 
 fn prepare_fresh_stack(root: Rc<RefCell<FiberRootNode>>, lane: Lane) {
@@ -268,9 +420,18 @@ fn prepare_fresh_stack(root: Rc<RefCell<FiberRootNode>>, lane: Lane) {
     }
 }
 
-fn work_loop() -> Result<(), JsValue> {
+fn work_loop_sync() -> Result<(), JsValue> {
     unsafe {
         while WORK_IN_PROGRESS.is_some() {
+            perform_unit_of_work(WORK_IN_PROGRESS.clone().unwrap())?;
+        }
+    }
+    Ok(())
+}
+
+fn work_loop_concurrent() -> Result<(), JsValue> {
+    unsafe {
+        while WORK_IN_PROGRESS.is_some() && !unstable_should_yield_to_host() {
             perform_unit_of_work(WORK_IN_PROGRESS.clone().unwrap())?;
         }
     }

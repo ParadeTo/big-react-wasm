@@ -6,6 +6,7 @@ use wasm_bindgen::JsValue;
 
 use react_reconciler::fiber::FiberRootNode;
 use react_reconciler::Reconciler;
+use web_sys::Element;
 
 use crate::synthetic_event::init_event;
 
@@ -28,6 +29,15 @@ impl Renderer {
             container: container.clone(),
         }
     }
+
+    // fn clear_container_dom(&self) {
+    //     let ele = self.container.dyn_ref::<Element>().unwrap();
+    //     if !ele.has_child_nodes() {
+    //         return;
+    //     }
+
+    //     ele.child_nodes
+    // }
 }
 
 #[wasm_bindgen]
@@ -36,5 +46,10 @@ impl Renderer {
         init_event(self.container.clone(), "click".to_string());
         self.reconciler
             .update_container(element.clone(), self.root.clone())
+    }
+
+    pub fn unmount(&self) -> JsValue {
+        self.reconciler
+            .update_container(JsValue::null(), self.root.clone())
     }
 }
