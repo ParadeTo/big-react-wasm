@@ -1,17 +1,18 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
-use wasm_bindgen::prelude::{Closure, wasm_bindgen};
 use web_sys::js_sys::{Array, Function, Object, Reflect};
 
 use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_flags::Flags;
-use crate::fiber_lanes::{Lane, request_update_lane};
+use crate::fiber_lanes::{merge_lanes, request_update_lane, Lane};
 use crate::update_queue::{
-    create_update, create_update_queue, enqueue_update, process_update_queue, UpdateQueue,
+    create_update, create_update_queue, enqueue_update, process_update_queue,
+    ReturnOfProcessUpdateQueue, Update, UpdateQueue,
 };
 use crate::work_loop::schedule_update_on_fiber;
 
@@ -55,7 +56,12 @@ impl Effect {
 #[derive(Debug, Clone)]
 pub struct Hook {
     memoized_state: Option<MemoizedState>,
+    // 对于state，保存update相关数据
     update_queue: Option<Rc<RefCell<UpdateQueue>>>,
+    // 对于state，保存开始更新前就存在的updateList（上次更新遗留）
+    base_queue: Option<Rc<RefCell<Update>>>,
+    // 对于state，基于baseState开始计算更新，与memoizedState的区别在于上次更新是否存在跳过
+    base_state: Option<MemoizedState>,
     next: Option<Rc<RefCell<Hook>>>,
 }
 
@@ -63,11 +69,15 @@ impl Hook {
     fn new(
         memoized_state: Option<MemoizedState>,
         update_queue: Option<Rc<RefCell<UpdateQueue>>>,
+        base_queue: Option<Rc<RefCell<Update>>>,
+        base_state: Option<MemoizedState>,
         next: Option<Rc<RefCell<Hook>>>,
     ) -> Self {
         Hook {
             memoized_state,
             update_queue,
+            base_queue,
+            base_state,
             next,
         }
     }
@@ -148,7 +158,7 @@ pub fn render_with_hooks(
 }
 
 fn mount_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
-    let hook = Rc::new(RefCell::new(Hook::new(None, None, None)));
+    let hook = Rc::new(RefCell::new(Hook::new(None, None, None, None, None)));
     unsafe {
         if WORK_IN_PROGRESS_HOOK.is_none() {
             if CURRENTLY_RENDERING_FIBER.is_none() {
@@ -236,6 +246,8 @@ fn update_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
             let new_hook = Rc::new(RefCell::new(Hook::new(
                 current_hook.memoized_state.clone(),
                 current_hook.update_queue.clone(),
+                current_hook.base_queue.clone(),
+                current_hook.base_state.clone(),
                 None,
             )));
 
@@ -285,7 +297,7 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     let closure = Closure::wrap(Box::new(move |action: &JsValue| {
         dispatch_set_state(fiber.clone(), (*q_rc_cloned).clone(), action)
     }) as Box<dyn Fn(&JsValue)>);
-    let function = closure.as_ref().unchecked_ref::<Function>().clone();
+    let function: Function = closure.as_ref().unchecked_ref::<Function>().clone();
     closure.forget();
 
     queue.clone().borrow_mut().dispatch = Some(function.clone());
@@ -302,15 +314,62 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
 
     let hook_cloned = hook.clone().unwrap().clone();
     let queue = hook_cloned.borrow().update_queue.clone();
-    let base_state = hook_cloned.borrow().memoized_state.clone();
+    let base_state = hook_cloned.borrow().base_state.clone();
 
-    unsafe {
-        hook_cloned.borrow_mut().memoized_state = process_update_queue(
-            base_state,
-            queue.clone(),
-            CURRENTLY_RENDERING_FIBER.clone().unwrap(),
-            RENDER_LANE.clone(),
-        );
+    let mut base_queue = unsafe { CURRENT_HOOK.clone().unwrap().borrow().base_queue.clone() };
+    let pending = queue.clone().unwrap().borrow().shared.pending.clone();
+
+    if pending.is_some() {
+        if base_queue.is_some() {
+            let base_queue = base_queue.clone().unwrap();
+            let pending = pending.clone().unwrap();
+            // baseQueue = b2 -> b0 -> b1 -> b2
+            // pending = p2 -> p0 -> p1 -> p2
+
+            // b0
+            let base_first = base_queue.borrow().next.clone();
+            // p0
+            let pending_first = pending.borrow().next.clone();
+            // baseQueue = b2 -> p0 -> p1 -> p2
+            base_queue.borrow_mut().next = pending_first;
+            // pending = p2 -> b0 -> b1 -> b2
+            pending.borrow_mut().next = base_first;
+            // 拼接完成后：先pending，再baseQueue
+            // baseQueue = b2 -> p0 -> p1 -> p2 -> b0 -> b1 -> b2
+        }
+        // pending保存在current中，因为commit阶段不完成，current不会变为wip
+        // 所以可以保证多次render阶段（只要不进入commit）都能从current恢复pending
+        unsafe { CURRENT_HOOK.clone().unwrap().borrow_mut().base_queue = pending.clone() };
+        base_queue = pending;
+        queue.clone().unwrap().borrow_mut().shared.pending = None;
+    }
+
+    if base_queue.is_some() {
+        log!("base state is {:?}", base_state);
+        let ReturnOfProcessUpdateQueue {
+            memoized_state,
+            base_state: new_base_state,
+            base_queue: new_base_queue,
+            skipped_update_lanes,
+        } = process_update_queue(base_state, base_queue, unsafe { RENDER_LANE.clone() });
+        unsafe {
+            let lanes = {
+                CURRENTLY_RENDERING_FIBER
+                    .clone()
+                    .unwrap()
+                    .borrow()
+                    .lanes
+                    .clone()
+            };
+            CURRENTLY_RENDERING_FIBER
+                .clone()
+                .unwrap()
+                .borrow_mut()
+                .lanes = merge_lanes(lanes, skipped_update_lanes)
+        };
+        hook_cloned.borrow_mut().memoized_state = memoized_state;
+        hook_cloned.borrow_mut().base_state = new_base_state;
+        hook_cloned.borrow_mut().base_queue = new_base_queue;
     }
 
     Ok(vec![
@@ -421,7 +480,12 @@ fn update_effect(create: Function, deps: JsValue) {
 
                     if are_hook_inputs_equal(&prev_deps, &next_deps) {
                         hook.as_ref().unwrap().borrow_mut().memoized_state =
-                            Some(MemoizedState::Effect(push_effect(Flags::Passive, create, destroy, next_deps)));
+                            Some(MemoizedState::Effect(push_effect(
+                                Flags::Passive,
+                                create,
+                                destroy,
+                                next_deps,
+                            )));
                         return;
                     }
                 }
@@ -430,7 +494,11 @@ fn update_effect(create: Function, deps: JsValue) {
             }
         }
 
-        CURRENTLY_RENDERING_FIBER.as_ref().unwrap().borrow_mut().flags |= Flags::PassiveEffect;
+        CURRENTLY_RENDERING_FIBER
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .flags |= Flags::PassiveEffect;
         log!("CURRENTLY_RENDERING_FIBER.as_ref().unwrap().borrow_mut()");
 
         hook.as_ref().unwrap().clone().borrow_mut().memoized_state =

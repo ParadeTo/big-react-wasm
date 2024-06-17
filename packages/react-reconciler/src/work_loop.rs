@@ -210,7 +210,9 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane, should_time_slice:
         EXECUTION_CONTEXT = prev_execution_context;
         WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane;
     }
-
+    log!("EXECUTION_CONTEXT is {:?}", unsafe {
+        EXECUTION_CONTEXT.clone()
+    });
     ROOT_COMPLETED
 }
 
@@ -220,7 +222,7 @@ fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout
             & (ExecutionContext::RenderContext | ExecutionContext::CommitContext)
             != ExecutionContext::NoContext
         {
-            panic!("No in React work process")
+            panic!("No in React work process {:?}", EXECUTION_CONTEXT)
         }
     }
 
@@ -397,7 +399,7 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
         cloned.borrow_mut().current = finished_work.clone();
 
         unsafe {
-            EXECUTION_CONTEXT |= prev_execution_context;
+            EXECUTION_CONTEXT = prev_execution_context;
         }
     } else {
         cloned.borrow_mut().current = finished_work.clone();

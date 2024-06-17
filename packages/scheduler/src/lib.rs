@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::cmp::{Ordering, PartialEq};
 
 use wasm_bindgen::prelude::*;
@@ -293,6 +292,14 @@ pub fn unstable_should_yield_to_host() -> bool {
         }
     }
     return true;
+}
+
+pub fn unstable_run_with_priority(priority_level: Priority, event_handler: &Function) {
+    let previous_priority_level = unsafe { CURRENT_PRIORITY_LEVEL.clone() };
+    unsafe { CURRENT_PRIORITY_LEVEL = priority_level.clone() };
+
+    event_handler.call0(&JsValue::null());
+    unsafe { CURRENT_PRIORITY_LEVEL = previous_priority_level.clone() };
 }
 
 fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValue> {

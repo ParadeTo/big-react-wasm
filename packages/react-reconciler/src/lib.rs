@@ -20,12 +20,12 @@ mod complete_work;
 pub mod fiber;
 mod fiber_flags;
 mod fiber_hooks;
+pub mod fiber_lanes;
+mod hook_effect_tags;
+mod sync_task_queue;
 mod update_queue;
 mod work_loop;
 mod work_tags;
-mod fiber_lanes;
-mod sync_task_queue;
-mod hook_effect_tags;
 
 pub static mut HOST_CONFIG: Option<Rc<dyn HostConfig>> = None;
 static mut COMPLETE_WORK: Option<CompleteWork> = None;

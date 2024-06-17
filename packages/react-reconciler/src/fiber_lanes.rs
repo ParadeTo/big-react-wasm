@@ -2,7 +2,7 @@ use bitflags::bitflags;
 use scheduler::{unstable_get_current_priority_level, Priority};
 
 bitflags! {
-    #[derive(Debug, Clone, Eq)]
+    #[derive(Debug, Clone)]
     pub struct Lane: u32 {
         const NoLane =              0b0000000000000000000000000000000;
         const SyncLane =            0b0000000000000000000000000000001; // onClick
@@ -18,6 +18,8 @@ impl PartialEq for Lane {
     }
 }
 
+impl Eq for Lane {}
+
 pub fn get_highest_priority(lanes: Lane) -> Lane {
     let lanes = lanes.bits();
     let highest_priority = lanes & (lanes.wrapping_neg());
@@ -29,7 +31,7 @@ pub fn merge_lanes(lane_a: Lane, lane_b: Lane) -> Lane {
 }
 
 pub fn is_subset_of_lanes(set: Lane, subset: Lane) -> bool {
-    (set & subset) == subset
+    (set & subset.clone()) == subset
 }
 
 pub fn request_update_lane() -> Lane {
@@ -49,10 +51,12 @@ pub fn scheduler_priority_to_lane(scheduler_priority: Priority) -> Lane {
 
 pub fn lanes_to_scheduler_priority(lanes: Lane) -> Priority {
     let lane = get_highest_priority(lanes);
-    match lane {
-        Lane::SyncLane => Priority::ImmediatePriority,
-        Lane::InputContinuousLane => Priority::UserBlockingPriority,
-        Lane::DefaultLane => Priority::NormalPriority,
-        _ => Priority::IdlePriority,
+    if lane == Lane::SyncLane {
+        return Priority::ImmediatePriority;
+    } else if lane == Lane::InputContinuousLane {
+        return Priority::UserBlockingPriority;
+    } else if lane == Lane::DefaultLane {
+        return Priority::NormalPriority;
     }
+    Priority::IdlePriority
 }
