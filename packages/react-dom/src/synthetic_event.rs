@@ -5,7 +5,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Function, Object, Reflect};
 use web_sys::{Element, Event};
 
-use react_reconciler::fiber_lanes::Lane;
+use react_reconciler::fiber_lanes::{lanes_to_scheduler_priority, Lane};
 use shared::{derive_from_js_value, is_dev, log};
 
 static VALID_EVENT_TYPE_LIST: [&str; 1] = ["click"];
@@ -25,13 +25,14 @@ impl Paths {
     }
 }
 
-// fn event_type_to_event_priority(event_type: &str) -> Priority {
-//     match event_type {
-//         "click" | "keydown" | "keyup" => Lane::SyncLane,
-//         "scroll" => Lane::InputContinuousLane,
-//         _ => Lane::DefaultLane,
-//     }
-// }
+fn event_type_to_event_priority(event_type: &str) -> Priority {
+    let lane = match event_type {
+        "click" | "keydown" | "keyup" => Lane::InputContinuousLane,
+        "scroll" => Lane::InputContinuousLane,
+        _ => Lane::DefaultLane,
+    };
+    lanes_to_scheduler_priority(lane)
+}
 
 fn create_synthetic_event(e: Event) -> Event {
     Reflect::set(&*e, &"__stopPropagation".into(), &JsValue::from_bool(false))
@@ -62,13 +63,13 @@ fn create_synthetic_event(e: Event) -> Event {
 
 fn trigger_event_flow(paths: Vec<Function>, se: &Event) {
     for callback in paths {
-        // unstable_run_with_priority(
-        //     event_type_to_event_priority(se.type_().as_str()),
-        //     &callback.bind1(&JsValue::null(), se),
-        // );
-        callback
-            .call1(&JsValue::null(), se)
-            .expect("TODO: panic call callback");
+        unstable_run_with_priority(
+            event_type_to_event_priority(se.type_().as_str()),
+            &callback.bind1(&JsValue::null(), se),
+        );
+        // callback
+        //     .call1(&JsValue::null(), se)
+        //     .expect("TODO: panic call callback");
         if derive_from_js_value(se, "__stopPropagation")
             .as_bool()
             .unwrap()

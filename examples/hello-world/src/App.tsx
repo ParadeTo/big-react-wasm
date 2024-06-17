@@ -2,7 +2,7 @@ import {useState} from 'react'
 
 function App() {
   const [num, updateNum] = useState(0)
-  const len = 1
+  const len = 100
 
   console.log('num', num)
   return (

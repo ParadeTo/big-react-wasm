@@ -146,8 +146,8 @@ fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
         let scheduler_priority = lanes_to_scheduler_priority(cur_priority.clone());
         let closure = Closure::wrap(Box::new(move |did_timeout_js_value: JsValue| {
             let did_timeout = did_timeout_js_value.as_bool().unwrap();
-            perform_concurrent_work_on_root(root_cloned.clone(), did_timeout);
-        }) as Box<dyn Fn(JsValue)>);
+            perform_concurrent_work_on_root(root_cloned.clone(), did_timeout)
+        }) as Box<dyn Fn(JsValue) -> JsValue>);
         let function = closure.as_ref().unchecked_ref::<Function>().clone();
         closure.forget();
         new_callback_node = Some(unstable_schedule_callback_no_delay(
@@ -196,9 +196,14 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane, should_time_slice:
         };
     }
 
-    log!("{:?}", *root.clone().borrow());
+    // log!("render over {:?}", *root.clone().borrow());
+    log!("render over {:?}", unsafe { WORK_IN_PROGRESS.clone() });
+    // log!("render over");
 
     unsafe {
+        EXECUTION_CONTEXT = prev_execution_context;
+        WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane;
+
         if should_time_slice && WORK_IN_PROGRESS.is_some() {
             return ROOT_INCOMPLETE;
         }
@@ -206,17 +211,12 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane, should_time_slice:
         if !should_time_slice && WORK_IN_PROGRESS.is_some() {
             log!("The WIP is not null when render finishing")
         }
-
-        EXECUTION_CONTEXT = prev_execution_context;
-        WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane;
     }
-    log!("EXECUTION_CONTEXT is {:?}", unsafe {
-        EXECUTION_CONTEXT.clone()
-    });
+
     ROOT_COMPLETED
 }
 
-fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout: bool) {
+fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout: bool) -> JsValue {
     unsafe {
         if EXECUTION_CONTEXT.clone()
             & (ExecutionContext::RenderContext | ExecutionContext::CommitContext)
@@ -242,7 +242,7 @@ fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout
 
     let lanes = root.borrow().get_next_lanes();
     if lanes == Lane::NoLane {
-        return;
+        return JsValue::undefined();
     }
 
     let should_time_slice = !did_timeout;
@@ -252,9 +252,16 @@ fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout
     if exit_status == ROOT_INCOMPLETE {
         if root.borrow().callback_node.as_ref().unwrap().id != cur_callback_node.unwrap().id {
             // 调度了更高优更新，这个更新已经被取消了
-            return;
+            return JsValue::undefined();
         }
-        return perform_concurrent_work_on_root(root, false);
+        let root_cloned = root.clone();
+        let closure = Closure::wrap(Box::new(move |did_timeout_js_value: JsValue| {
+            let did_timeout = did_timeout_js_value.as_bool().unwrap();
+            perform_concurrent_work_on_root(root_cloned.clone(), did_timeout)
+        }) as Box<dyn Fn(JsValue) -> JsValue>);
+        let function = closure.as_ref().unchecked_ref::<Function>().clone();
+        closure.forget();
+        return function.into();
     }
 
     if exit_status == ROOT_COMPLETED {
@@ -274,6 +281,8 @@ fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout
     } else {
         todo!("Unsupported status of concurrent render")
     }
+
+    JsValue::undefined()
 }
 
 fn perform_sync_work_on_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane) {
@@ -434,6 +443,7 @@ fn work_loop_sync() -> Result<(), JsValue> {
 fn work_loop_concurrent() -> Result<(), JsValue> {
     unsafe {
         while WORK_IN_PROGRESS.is_some() && !unstable_should_yield_to_host() {
+            log!("work_loop_concurrent");
             perform_unit_of_work(WORK_IN_PROGRESS.clone().unwrap())?;
         }
     }

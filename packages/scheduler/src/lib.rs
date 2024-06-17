@@ -1,5 +1,6 @@
 use std::cmp::{Ordering, PartialEq};
 
+use shared::log;
 use wasm_bindgen::prelude::*;
 use web_sys::js_sys::{global, Function};
 use web_sys::{MessageChannel, MessagePort};
@@ -8,7 +9,7 @@ use crate::heap::{peek, peek_mut, pop, push};
 
 mod heap;
 
-static FRAME_YIELD_MS: f64 = 5.0;
+static FRAME_YIELD_MS: f64 = 8.0;
 static mut TASK_ID_COUNTER: u32 = 1;
 static mut TASK_QUEUE: Vec<Task> = vec![];
 static mut TIMER_QUEUE: Vec<Task> = vec![];
@@ -287,6 +288,7 @@ fn flush_work(has_time_remaining: bool, initial_time: f64) -> bool {
 pub fn unstable_should_yield_to_host() -> bool {
     unsafe {
         let time_elapsed = unstable_now() - START_TIME;
+        log!("start_time: {:?}, now: {:?}", START_TIME, unstable_now());
         if time_elapsed < FRAME_YIELD_MS {
             return false;
         }
