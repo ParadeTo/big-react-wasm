@@ -9,7 +9,7 @@ use crate::heap::{peek, peek_mut, pop, push};
 
 mod heap;
 
-static FRAME_YIELD_MS: f64 = 8.0;
+static FRAME_YIELD_MS: f64 = 5.0;
 static mut TASK_ID_COUNTER: u32 = 1;
 static mut TASK_QUEUE: Vec<Task> = vec![];
 static mut TIMER_QUEUE: Vec<Task> = vec![];
