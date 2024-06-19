@@ -27,7 +27,7 @@ impl Paths {
 
 fn event_type_to_event_priority(event_type: &str) -> Priority {
     let lane = match event_type {
-        "click" | "keydown" | "keyup" => Lane::InputContinuousLane,
+        "click" | "keydown" | "keyup" => Lane::SyncLane,
         "scroll" => Lane::InputContinuousLane,
         _ => Lane::DefaultLane,
     };
