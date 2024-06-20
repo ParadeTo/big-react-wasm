@@ -1,37 +1,55 @@
-import {useEffect, useState} from 'react'
+import {useState, useEffect} from 'react'
+// function App() {
+//   const [num, updateNum] = useState(0)
+//   const len = 100
 
-function App() {
-    const [num, updateNum] = useState(0);
-    return (
-        <ul
-            onClick={(e) => {
-                updateNum((num: number) => num + 1);
-            }}
-        >
-            <Child1 num={num}/>
-            {num === 1 ? null : <Child2 num={num}/>}
-        </ul>
-    );
+//   console.log('num', num)
+//   return (
+//     <ul
+//       onClick={(e) => {
+//         updateNum((num: number) => num + 1)
+//       }}>
+//       {Array(len)
+//         .fill(1)
+//         .map((_, i) => {
+//           return <Child i={`${i} ${num}`} />
+//         })}
+//     </ul>
+//   )
+// }
+
+// function Child({i}) {
+//   return <p>i am child {i}</p>
+// }
+
+// export default App
+
+const Item = ({i, children}) => {
+  for (let i = 0; i < 999999; i++) {}
+  return <span key={i}>{children}</span>
 }
 
-function Child1({num}: { num: number }) {
-    useEffect(() => {
-        console.log('child1 create')
-        return () => {
-            console.log('child1 destroy')
-        }
-    }, [num]);
-    return <div>child1 {num}</div>;
-}
+export default () => {
+  const [count, updateCount] = useState(0)
 
-function Child2({num}: { num: number }) {
-    useEffect(() => {
-        console.log('child2 create')
-        return () => {
-            console.log('child2 destroy')
-        }
-    }, [num]);
-    return <div>child2 {num}</div>;
-}
+  const onClick = () => {
+    updateCount(2)
+  }
 
-export default App
+  useEffect(() => {
+    const button = document.querySelector('button')
+    setTimeout(() => updateCount((num) => num + 1), 1000)
+    setTimeout(() => button.click(), 1100)
+  }, [])
+
+  return (
+    <div>
+      <button onClick={onClick}>增加2</button>
+      <div style={{wordWrap: 'break-word'}}>
+        {Array.from(new Array(1000)).map((v, index) => (
+          <Item i={index}>{count}</Item>
+        ))}
+      </div>
+    </div>
+  )
+}

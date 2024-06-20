@@ -36,6 +36,7 @@ pub fn create_root(container: &JsValue) -> Renderer {
         }
     };
 
+    // TODO cache the container
     // let mut root;
     // unsafe {
     //     if CONTAINER_TO_ROOT.is_none() {

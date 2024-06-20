@@ -5,6 +5,7 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
 
+use scheduler::Task;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
@@ -12,7 +13,7 @@ use shared::{derive_from_js_value, log, type_of};
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::{Effect, Hook};
-use crate::fiber_lanes::{Lane, merge_lanes};
+use crate::fiber_lanes::{get_highest_priority, merge_lanes, Lane};
 use crate::update_queue::{Update, UpdateQueue};
 use crate::work_tags::WorkTag;
 
@@ -75,7 +76,7 @@ impl Debug for FiberNode {
                     self.flags,
                     self.subtree_flags
                 )
-                    .expect("print error");
+                .expect("print error");
             }
             WorkTag::HostRoot => {
                 write!(
@@ -84,7 +85,7 @@ impl Debug for FiberNode {
                     WorkTag::HostRoot,
                     self.subtree_flags
                 )
-                    .expect("print error");
+                .expect("print error");
             }
             WorkTag::HostComponent => {
                 write!(
@@ -92,7 +93,7 @@ impl Debug for FiberNode {
                     "{:?}(key:{:?}, flags:{:?}, subtreeFlags:{:?})",
                     self._type, self.key, self.flags, self.subtree_flags
                 )
-                    .expect("print error");
+                .expect("print error");
             }
             WorkTag::HostText => {
                 write!(
@@ -103,7 +104,7 @@ impl Debug for FiberNode {
                         .unwrap(),
                     self.flags
                 )
-                    .expect("print error");
+                .expect("print error");
             }
         })
     }
@@ -232,7 +233,9 @@ pub struct FiberRootNode {
     pub current: Rc<RefCell<FiberNode>>,
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
     pub pending_lanes: Lane,
-    pub finished_lane: Lane,
+    pub finished_lanes: Lane,
+    pub callback_node: Option<Task>,
+    pub callback_priority: Lane,
     pub pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>,
 }
 
@@ -243,11 +246,13 @@ impl FiberRootNode {
             current: host_root_fiber,
             finished_work: None,
             pending_lanes: Lane::NoLane,
-            finished_lane: Lane::NoLane,
+            finished_lanes: Lane::NoLane,
             pending_passive_effects: Rc::new(RefCell::new(PendingPassiveEffects {
                 unmount: vec![],
                 update: vec![],
             })),
+            callback_node: None,
+            callback_priority: Lane::NoLane,
         }
     }
 
@@ -257,6 +262,21 @@ impl FiberRootNode {
 
     pub fn mark_root_updated(&mut self, lane: Lane) {
         self.pending_lanes = merge_lanes(self.pending_lanes.clone(), lane)
+    }
+
+    pub fn get_next_lanes(&self) -> Lane {
+        let pending_lanes = self.pending_lanes.clone();
+        if pending_lanes == Lane::NoLane {
+            return Lane::NoLane;
+        }
+
+        let next_lanes = get_highest_priority(pending_lanes);
+
+        if next_lanes == Lane::NoLane {
+            return Lane::NoLane;
+        }
+
+        next_lanes
     }
 }
 
@@ -279,9 +299,9 @@ impl Debug for FiberRootNode {
             queue.push_back(QueueItem::new(Rc::clone(&node), 0));
 
             while let Some(QueueItem {
-                               node: current,
-                               depth,
-                           }) = queue.pop_front()
+                node: current,
+                depth,
+            }) = queue.pop_front()
             {
                 let current_ref = current.borrow();
 
@@ -300,9 +320,9 @@ impl Debug for FiberRootNode {
                 }
 
                 if let Some(QueueItem {
-                                node: next,
-                                depth: next_depth,
-                            }) = queue.front()
+                    node: next,
+                    depth: next_depth,
+                }) = queue.front()
                 {
                     if *next_depth != depth {
                         writeln!(f, "").expect("print error");

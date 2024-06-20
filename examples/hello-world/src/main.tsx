@@ -1,21 +1,7 @@
 import {createRoot} from 'react-dom'
-import {useEffect} from 'react'
+import App from './App'
 
 const root = createRoot(document.getElementById('root'))
 
-function Parent() {
-  useEffect(() => {
-    return () => console.log('Unmount parent')
-  })
-  return <Child />
-}
-
-function Child() {
-  useEffect(() => {
-    return () => console.log('Unmount child')
-  })
-  return 'Child'
-}
-
-root.render(<Parent />)
+root.render(<App />)
 // console.log(root.getChildrenAsJSX())

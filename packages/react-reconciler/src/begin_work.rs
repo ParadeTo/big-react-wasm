@@ -9,7 +9,7 @@ use crate::child_fiber::{mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_hooks::render_with_hooks;
 use crate::fiber_lanes::Lane;
-use crate::update_queue::process_update_queue;
+use crate::update_queue::{process_update_queue, ReturnOfProcessUpdateQueue};
 use crate::work_tags::WorkTag;
 
 pub fn begin_work(
@@ -18,7 +18,9 @@ pub fn begin_work(
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
     let tag = work_in_progress.clone().borrow().tag.clone();
     return match tag {
-        WorkTag::FunctionComponent => update_function_component(work_in_progress.clone(), render_lane),
+        WorkTag::FunctionComponent => {
+            update_function_component(work_in_progress.clone(), render_lane)
+        }
         WorkTag::HostRoot => Ok(update_host_root(work_in_progress.clone(), render_lane)),
         WorkTag::HostComponent => Ok(update_host_component(work_in_progress.clone())),
         WorkTag::HostText => Ok(None),
@@ -34,20 +36,31 @@ fn update_function_component(
     Ok(work_in_progress.clone().borrow().child.clone())
 }
 
-fn update_host_root(work_in_progress: Rc<RefCell<FiberNode>>, render_lane: Lane) -> Option<Rc<RefCell<FiberNode>>> {
+fn update_host_root(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    render_lane: Lane,
+) -> Option<Rc<RefCell<FiberNode>>> {
     let work_in_progress_cloned = work_in_progress.clone();
 
     let base_state;
-    let update_queue;
+    let mut pending;
     {
         let work_in_progress_borrowed = work_in_progress_cloned.borrow();
         base_state = work_in_progress_borrowed.memoized_state.clone();
-        update_queue = work_in_progress_borrowed.update_queue.clone();
+        pending = work_in_progress_borrowed
+            .update_queue
+            .clone()
+            .unwrap()
+            .borrow()
+            .shared
+            .pending
+            .clone();
     }
 
     {
-        work_in_progress.clone().borrow_mut().memoized_state =
-            process_update_queue(base_state, update_queue, work_in_progress.clone(), render_lane);
+        let ReturnOfProcessUpdateQueue { memoized_state, .. } =
+            process_update_queue(base_state, pending, render_lane);
+        work_in_progress.clone().borrow_mut().memoized_state = memoized_state;
     }
 
     let next_children = work_in_progress_cloned.borrow().memoized_state.clone();
