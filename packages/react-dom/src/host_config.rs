@@ -2,11 +2,11 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use js_sys::{Function, global, Promise};
 use js_sys::JSON::stringify;
-use wasm_bindgen::JsValue;
+use js_sys::{global, Function, Promise};
 use wasm_bindgen::prelude::*;
-use web_sys::{Node, window};
+use wasm_bindgen::JsValue;
+use web_sys::{window, Node};
 
 use react_reconciler::HostConfig;
 use shared::{log, type_of};
@@ -162,7 +162,14 @@ impl HostConfig for ReactDomHostConfig {
             .is_function()
         {
             let closure_clone = closure.clone();
-            queueMicrotask(&closure_clone.borrow_mut().as_ref().unwrap().as_ref().unchecked_ref::<JsValue>());
+            queueMicrotask(
+                &closure_clone
+                    .borrow_mut()
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unchecked_ref::<JsValue>(),
+            );
             closure_clone.borrow_mut().take().unwrap_throw().forget();
         } else if js_sys::Reflect::get(&*global(), &JsValue::from_str("Promise"))
             .map(|value| value.is_function())
@@ -179,7 +186,15 @@ impl HostConfig for ReactDomHostConfig {
             c.forget();
         } else {
             let closure_clone = closure.clone();
-            setTimeout(&closure_clone.borrow_mut().as_ref().unwrap().as_ref().unchecked_ref::<JsValue>(), 0);
+            setTimeout(
+                &closure_clone
+                    .borrow_mut()
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .unchecked_ref::<JsValue>(),
+                0,
+            );
             closure_clone.borrow_mut().take().unwrap_throw().forget();
         }
     }

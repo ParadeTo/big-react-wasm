@@ -1,4 +1,4 @@
-use js_sys::{Array, JSON, Object, Reflect};
+use js_sys::{Array, Object, Reflect, JSON};
 use wasm_bindgen::prelude::*;
 
 use shared::{derive_from_js_value, REACT_ELEMENT_TYPE};
@@ -35,7 +35,7 @@ pub fn jsx_dev(_type: &JsValue, config: &JsValue, key: &JsValue) -> JsValue {
         &"$$typeof".into(),
         &JsValue::from_str(REACT_ELEMENT_TYPE),
     )
-        .expect("$$typeof panic");
+    .expect("$$typeof panic");
     Reflect::set(&react_element, &"type".into(), _type).expect("type panic");
 
     let props = Object::new();
@@ -90,7 +90,8 @@ pub fn jsx(_type: &JsValue, config: &JsValue, maybe_children: &JsValue) -> JsVal
                     Reflect::set(&config, &"children".into(), &children.get(0))
                         .expect("TODO: panic children");
                 } else {
-                    Reflect::set(&config, &"children".into(), maybe_children).expect("TODO: panic set children");
+                    Reflect::set(&config, &"children".into(), maybe_children)
+                        .expect("TODO: panic set children");
                 }
             }
         }
@@ -103,11 +104,11 @@ pub fn is_valid_element(object: &JsValue) -> bool {
     object.is_object()
         && !object.is_null()
         && Reflect::get(&object, &"$$typeof".into())
-        .unwrap_or("".into())
-        .as_string()
-        .unwrap_or("".into())
-        .as_str()
-        == REACT_ELEMENT_TYPE
+            .unwrap_or("".into())
+            .as_string()
+            .unwrap_or("".into())
+            .as_str()
+            == REACT_ELEMENT_TYPE
 }
 
 #[wasm_bindgen(js_name = useState)]
@@ -120,4 +121,10 @@ pub unsafe fn use_state(initial_state: &JsValue) -> Result<JsValue, JsValue> {
 pub unsafe fn use_effect(create: &JsValue, deps: &JsValue) {
     let use_effect = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_effect;
     use_effect.call2(&JsValue::null(), create, deps);
+}
+
+#[wasm_bindgen(js_name = useRef)]
+pub unsafe fn use_ref(initial_value: &JsValue) -> Result<JsValue, JsValue> {
+    let use_ref = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_ref;
+    use_ref.call1(&JsValue::null(), initial_value)
 }

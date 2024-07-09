@@ -108,8 +108,15 @@ fn update_hooks_to_dispatcher(is_update: bool) {
         .clone();
     use_effect_closure.forget();
 
+    // use_ref
+    let use_ref_closure = Closure::wrap(Box::new(if is_update { update_ref } else { mount_ref })
+        as Box<dyn Fn(&JsValue) -> JsValue>);
+    let use_ref = use_ref_closure.as_ref().unchecked_ref::<Function>().clone();
+    use_ref_closure.forget();
+
     Reflect::set(&object, &"use_state".into(), &use_state).expect("TODO: panic set use_state");
     Reflect::set(&object, &"use_effect".into(), &use_effect).expect("TODO: panic set use_effect");
+    Reflect::set(&object, &"use_ref".into(), &use_ref).expect("TODO: panic set use_ref");
 
     updateDispatcher(&object.into());
 }
@@ -528,4 +535,21 @@ fn are_hook_inputs_equal(next_deps: &JsValue, pre_deps: &JsValue) -> bool {
         return false;
     }
     return true;
+}
+
+fn mount_ref(initial_value: &JsValue) -> JsValue {
+    let hook = mount_work_in_progress_hook();
+    let ref_obj: Object = Object::new();
+    Reflect::set(&ref_obj, &"current".into(), initial_value);
+    hook.as_ref().unwrap().borrow_mut().memoized_state =
+        Some(MemoizedState::MemoizedJsValue(ref_obj.clone().into()));
+    ref_obj.into()
+}
+
+fn update_ref(initial_value: &JsValue) -> JsValue {
+    let hook = update_work_in_progress_hook();
+    match hook.unwrap().borrow_mut().memoized_state.clone() {
+        Some(MemoizedState::MemoizedJsValue(value)) => value,
+        _ => panic!("ref is none"),
+    }
 }

@@ -172,7 +172,12 @@ fn reconcile_single_text_node(
         current = current_rc.borrow().sibling.clone();
     }
 
-    let mut created = FiberNode::new(WorkTag::HostText, props.clone(), JsValue::null());
+    let mut created = FiberNode::new(
+        WorkTag::HostText,
+        props.clone(),
+        JsValue::null(),
+        JsValue::null(),
+    );
     created._return = Some(return_fiber.clone());
     Rc::new(RefCell::new(created))
 }
@@ -234,6 +239,7 @@ fn update_from_map(
             Some(Rc::new(RefCell::new(FiberNode::new(
                 WorkTag::HostText,
                 props.clone(),
+                JsValue::null(),
                 JsValue::null(),
             ))))
         };
