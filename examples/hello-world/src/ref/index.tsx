@@ -11,7 +11,7 @@ export default function App() {
   }, [])
 
   return (
-    <div ref={divRef} onClick={() => del(true)}>
+    <div ref={divRef} onClick={() => del((prev) => !prev)}>
       {isDel ? null : <Child />}
     </div>
   )

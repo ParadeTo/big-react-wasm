@@ -288,7 +288,6 @@ fn flush_work(has_time_remaining: bool, initial_time: f64) -> bool {
 pub fn unstable_should_yield_to_host() -> bool {
     unsafe {
         let time_elapsed = unstable_now() - START_TIME;
-        log!("start_time: {:?}, now: {:?}", START_TIME, unstable_now());
         if time_elapsed < FRAME_YIELD_MS {
             return false;
         }

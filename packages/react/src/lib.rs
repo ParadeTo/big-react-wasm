@@ -128,3 +128,15 @@ pub unsafe fn use_ref(initial_value: &JsValue) -> Result<JsValue, JsValue> {
     let use_ref = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_ref;
     use_ref.call1(&JsValue::null(), initial_value)
 }
+
+#[wasm_bindgen(js_name = useMemo)]
+pub unsafe fn use_memo(create: &JsValue, deps: &JsValue) -> Result<JsValue, JsValue> {
+    let use_memo = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_memo;
+    use_memo.call2(&JsValue::null(), create, deps)
+}
+
+#[wasm_bindgen(js_name = useCallback)]
+pub unsafe fn use_callback(callback: &JsValue, deps: &JsValue) -> Result<JsValue, JsValue> {
+    let use_callback = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_callback;
+    use_callback.call2(&JsValue::null(), callback, deps)
+}
