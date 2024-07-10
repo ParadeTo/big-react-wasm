@@ -79,7 +79,7 @@ fn update_host_root(
 fn mark_ref(current: Option<Rc<RefCell<FiberNode>>>, work_in_progress: Rc<RefCell<FiberNode>>) {
     let _ref = { work_in_progress.borrow()._ref.clone() };
     if (current.is_none() && !_ref.is_null())
-        || (current.is_some() && Object::is(&current.as_ref().unwrap().borrow()._ref, &_ref))
+        || (current.is_some() && !Object::is(&current.as_ref().unwrap().borrow()._ref, &_ref))
     {
         work_in_progress.borrow_mut().flags |= Flags::Ref;
     }
