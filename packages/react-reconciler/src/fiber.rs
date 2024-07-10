@@ -58,6 +58,7 @@ pub struct FiberNode {
     pub child: Option<Rc<RefCell<FiberNode>>>,
     pub alternate: Option<Rc<RefCell<FiberNode>>>,
     pub _type: JsValue,
+    pub _ref: JsValue,
     pub flags: Flags,
     pub subtree_flags: Flags,
     pub memoized_props: JsValue,
@@ -111,7 +112,7 @@ impl Debug for FiberNode {
 }
 
 impl FiberNode {
-    pub fn new(tag: WorkTag, pending_props: JsValue, key: JsValue) -> Self {
+    pub fn new(tag: WorkTag, pending_props: JsValue, key: JsValue, _ref: JsValue) -> Self {
         Self {
             index: 0,
             tag,
@@ -130,6 +131,7 @@ impl FiberNode {
             subtree_flags: Flags::NoFlags,
             deletions: vec![],
             lanes: Lane::NoLane,
+            _ref,
         }
     }
 
@@ -137,6 +139,7 @@ impl FiberNode {
         let _type = derive_from_js_value(ele, "type");
         let key = derive_from_js_value(ele, "key");
         let props = derive_from_js_value(ele, "props");
+        let _ref = derive_from_js_value(ele, "ref");
 
         let mut fiber_tag = WorkTag::FunctionComponent;
         if _type.is_string() {
@@ -145,7 +148,7 @@ impl FiberNode {
             log!("Unsupported type {:?}", ele);
         }
 
-        let mut fiber = FiberNode::new(fiber_tag, props, key);
+        let mut fiber = FiberNode::new(fiber_tag, props, key, _ref);
         fiber._type = _type;
         fiber
     }
@@ -175,7 +178,8 @@ impl FiberNode {
         return if w.is_none() {
             let wip = {
                 let c = c_rc.borrow();
-                let mut wip = FiberNode::new(c.tag.clone(), pending_props, c.key.clone());
+                let mut wip =
+                    FiberNode::new(c.tag.clone(), pending_props, c.key.clone(), c._ref.clone());
                 wip._type = c._type.clone();
                 wip.state_node = c.state_node.clone();
 
@@ -210,6 +214,7 @@ impl FiberNode {
                 wip.child = c.child.clone();
                 wip.memoized_props = c.memoized_props.clone();
                 wip.memoized_state = c.memoized_state.clone();
+                wip._ref = c._ref.clone();
             }
             w.clone()
         };

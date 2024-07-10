@@ -4,9 +4,11 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 
 use shared::derive_from_js_value;
+use web_sys::js_sys::Object;
 
 use crate::child_fiber::{mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
+use crate::fiber_flags::Flags;
 use crate::fiber_hooks::render_with_hooks;
 use crate::fiber_lanes::Lane;
 use crate::update_queue::{process_update_queue, ReturnOfProcessUpdateQueue};
@@ -74,6 +76,15 @@ fn update_host_root(
     work_in_progress.clone().borrow().child.clone()
 }
 
+fn mark_ref(current: Option<Rc<RefCell<FiberNode>>>, work_in_progress: Rc<RefCell<FiberNode>>) {
+    let _ref = { work_in_progress.borrow()._ref.clone() };
+    if (current.is_none() && !_ref.is_null())
+        || (current.is_some() && !Object::is(&current.as_ref().unwrap().borrow()._ref, &_ref))
+    {
+        work_in_progress.borrow_mut().flags |= Flags::Ref;
+    }
+}
+
 fn update_host_component(
     work_in_progress: Rc<RefCell<FiberNode>>,
 ) -> Option<Rc<RefCell<FiberNode>>> {
@@ -83,6 +94,9 @@ fn update_host_component(
         let ref_fiber_node = work_in_progress.borrow();
         derive_from_js_value(&ref_fiber_node.pending_props, "children")
     };
+
+    let alternate = { work_in_progress.borrow().alternate.clone() };
+    mark_ref(alternate, work_in_progress.clone());
 
     {
         reconcile_children(work_in_progress.clone(), Some(next_children));

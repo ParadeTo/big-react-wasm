@@ -9,11 +9,15 @@ use shared::{derive_from_js_value, log};
 
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::Flags;
-use crate::HostConfig;
 use crate::work_tags::WorkTag;
+use crate::HostConfig;
 
 pub struct CompleteWork {
     pub host_config: Rc<dyn HostConfig>,
+}
+
+fn mark_ref(fiber: Rc<RefCell<FiberNode>>) {
+    fiber.borrow_mut().flags |= Flags::Ref;
 }
 
 impl CompleteWork {
@@ -65,9 +69,9 @@ impl CompleteWork {
                 let node_cloned = node.clone().unwrap().clone();
                 if node_cloned.borrow()._return.is_none()
                     || Rc::ptr_eq(
-                    &node_cloned.borrow()._return.as_ref().unwrap(),
-                    &work_in_progress,
-                )
+                        &node_cloned.borrow()._return.as_ref().unwrap(),
+                        &work_in_progress,
+                    )
                 {
                     return;
                 }
@@ -135,7 +139,14 @@ impl CompleteWork {
             }
             WorkTag::HostComponent => {
                 if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
-                    log!("update properties")
+                    log!("update properties");
+                    let current = current.unwrap();
+                    if !Object::is(
+                        &current.borrow()._ref,
+                        &work_in_progress_cloned.borrow()._ref,
+                    ) {
+                        mark_ref(work_in_progress.clone());
+                    }
                 } else {
                     let instance = self.host_config.create_instance(
                         work_in_progress
@@ -150,6 +161,9 @@ impl CompleteWork {
                     self.append_all_children(instance.clone(), work_in_progress.clone());
                     work_in_progress.clone().borrow_mut().state_node =
                         Some(Rc::new(StateNode::Element(instance.clone())));
+                    if !work_in_progress.borrow()._ref.is_null() {
+                        mark_ref(work_in_progress.clone());
+                    }
                 }
 
                 self.bubble_properties(work_in_progress.clone());

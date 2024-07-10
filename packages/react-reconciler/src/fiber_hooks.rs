@@ -108,8 +108,40 @@ fn update_hooks_to_dispatcher(is_update: bool) {
         .clone();
     use_effect_closure.forget();
 
+    // use_ref
+    let use_ref_closure = Closure::wrap(Box::new(if is_update { update_ref } else { mount_ref })
+        as Box<dyn Fn(&JsValue) -> JsValue>);
+    let use_ref = use_ref_closure.as_ref().unchecked_ref::<Function>().clone();
+    use_ref_closure.forget();
+
+    // use_memo
+    let use_memo_closure =
+        Closure::wrap(Box::new(if is_update { update_memo } else { mount_memo })
+            as Box<dyn Fn(Function, JsValue) -> Result<JsValue, JsValue>>);
+    let use_memo = use_memo_closure
+        .as_ref()
+        .unchecked_ref::<Function>()
+        .clone();
+    use_memo_closure.forget();
+
+    // use_callback
+    let use_callback_clusure = Closure::wrap(Box::new(if is_update {
+        update_callback
+    } else {
+        mount_callback
+    }) as Box<dyn Fn(Function, JsValue) -> JsValue>);
+    let use_callback = use_callback_clusure
+        .as_ref()
+        .unchecked_ref::<Function>()
+        .clone();
+    use_callback_clusure.forget();
+
     Reflect::set(&object, &"use_state".into(), &use_state).expect("TODO: panic set use_state");
     Reflect::set(&object, &"use_effect".into(), &use_effect).expect("TODO: panic set use_effect");
+    Reflect::set(&object, &"use_ref".into(), &use_ref).expect("TODO: panic set use_ref");
+    Reflect::set(&object, &"use_memo".into(), &use_memo).expect("TODO: panic set use_memo");
+    Reflect::set(&object, &"use_callback".into(), &use_callback)
+        .expect("TODO: panic set use_callback");
 
     updateDispatcher(&object.into());
 }
@@ -282,6 +314,8 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
         memoized_state = initial_state.clone();
     }
     hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+        Some(MemoizedState::MemoizedJsValue(memoized_state.clone()));
+    hook.as_ref().unwrap().clone().borrow_mut().base_state =
         Some(MemoizedState::MemoizedJsValue(memoized_state.clone()));
 
     unsafe {
@@ -528,4 +562,119 @@ fn are_hook_inputs_equal(next_deps: &JsValue, pre_deps: &JsValue) -> bool {
         return false;
     }
     return true;
+}
+
+fn mount_ref(initial_value: &JsValue) -> JsValue {
+    let hook = mount_work_in_progress_hook();
+    let ref_obj: Object = Object::new();
+    Reflect::set(&ref_obj, &"current".into(), initial_value);
+    hook.as_ref().unwrap().borrow_mut().memoized_state =
+        Some(MemoizedState::MemoizedJsValue(ref_obj.clone().into()));
+    ref_obj.into()
+}
+
+fn update_ref(initial_value: &JsValue) -> JsValue {
+    let hook = update_work_in_progress_hook();
+    match hook.unwrap().borrow_mut().memoized_state.clone() {
+        Some(MemoizedState::MemoizedJsValue(value)) => value,
+        _ => panic!("ref is none"),
+    }
+}
+
+fn mount_memo(create: Function, deps: JsValue) -> Result<JsValue, JsValue> {
+    let hook = mount_work_in_progress_hook();
+    let next_deps = if deps.is_undefined() {
+        JsValue::null()
+    } else {
+        deps
+    };
+    let next_value = create.call0(&JsValue::null())?;
+    let array = Array::new();
+    array.push(&next_value);
+    array.push(&next_deps);
+    hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+        Some(MemoizedState::MemoizedJsValue(array.into()));
+    Ok(next_value)
+}
+
+fn update_memo(create: Function, deps: JsValue) -> Result<JsValue, JsValue> {
+    let hook = update_work_in_progress_hook();
+    let next_deps = if deps.is_undefined() {
+        JsValue::null()
+    } else {
+        deps
+    };
+
+    if let MemoizedState::MemoizedJsValue(prev_state) = hook
+        .clone()
+        .unwrap()
+        .borrow()
+        .memoized_state
+        .as_ref()
+        .unwrap()
+    {
+        if !next_deps.is_null() {
+            let arr = prev_state.dyn_ref::<Array>().unwrap();
+            let prev_deps = arr.get(1);
+            if are_hook_inputs_equal(&next_deps, &prev_deps) {
+                return Ok(arr.get(0));
+            }
+        }
+        let next_value = create.call0(&JsValue::null())?;
+        let array = Array::new();
+        array.push(&next_value);
+        array.push(&next_deps);
+        hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+            Some(MemoizedState::MemoizedJsValue(array.into()));
+        return Ok(next_value);
+    }
+    panic!("update_memo, memoized_state is not JsValue");
+}
+
+fn mount_callback(callback: Function, deps: JsValue) -> JsValue {
+    let hook = mount_work_in_progress_hook();
+    let next_deps = if deps.is_undefined() {
+        JsValue::null()
+    } else {
+        deps
+    };
+    let array = Array::new();
+    array.push(&callback);
+    array.push(&next_deps);
+    hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+        Some(MemoizedState::MemoizedJsValue(array.into()));
+    callback.into()
+}
+
+fn update_callback(callback: Function, deps: JsValue) -> JsValue {
+    let hook = update_work_in_progress_hook();
+    let next_deps = if deps.is_undefined() {
+        JsValue::null()
+    } else {
+        deps
+    };
+
+    if let MemoizedState::MemoizedJsValue(prev_state) = hook
+        .clone()
+        .unwrap()
+        .borrow()
+        .memoized_state
+        .as_ref()
+        .unwrap()
+    {
+        if !next_deps.is_null() {
+            let arr = prev_state.dyn_ref::<Array>().unwrap();
+            let prev_deps = arr.get(1);
+            if are_hook_inputs_equal(&next_deps, &prev_deps) {
+                return arr.get(0);
+            }
+        }
+        let array = Array::new();
+        array.push(&callback);
+        array.push(&next_deps);
+        hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+            Some(MemoizedState::MemoizedJsValue(array.into()));
+        return callback.into();
+    }
+    panic!("update_callback, memoized_state is not JsValue");
 }

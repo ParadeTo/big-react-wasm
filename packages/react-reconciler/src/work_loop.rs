@@ -13,13 +13,16 @@ use scheduler::{
 use shared::{is_dev, log};
 
 use crate::begin_work::begin_work;
-use crate::commit_work::CommitWork;
+use crate::commit_work::{
+    commit_hook_effect_list_destroy, commit_hook_effect_list_mount,
+    commit_hook_effect_list_unmount, commit_layout_effects, commit_mutation_effects,
+};
 use crate::fiber::{FiberNode, FiberRootNode, PendingPassiveEffects, StateNode};
 use crate::fiber_flags::{get_mutation_mask, get_passive_mask, Flags};
 use crate::fiber_lanes::{get_highest_priority, lanes_to_scheduler_priority, merge_lanes, Lane};
 use crate::sync_task_queue::{flush_sync_callbacks, schedule_sync_callback};
 use crate::work_tags::WorkTag;
-use crate::{COMMIT_WORK, COMPLETE_WORK, HOST_CONFIG};
+use crate::{COMPLETE_WORK, HOST_CONFIG};
 
 bitflags! {
     #[derive(Debug, Clone)]
@@ -325,23 +328,17 @@ fn flush_passive_effects(pending_passive_effects: Rc<RefCell<PendingPassiveEffec
         let mut did_flush_passive_effects = false;
         for effect in &pending_passive_effects.borrow().unmount {
             did_flush_passive_effects = true;
-            CommitWork::commit_hook_effect_list_destroy(Flags::Passive, effect.clone());
+            commit_hook_effect_list_destroy(Flags::Passive, effect.clone());
         }
         pending_passive_effects.borrow_mut().unmount = vec![];
 
         for effect in &pending_passive_effects.borrow().update {
             did_flush_passive_effects = true;
-            CommitWork::commit_hook_effect_list_unmount(
-                Flags::Passive | Flags::HookHasEffect,
-                effect.clone(),
-            );
+            commit_hook_effect_list_unmount(Flags::Passive | Flags::HookHasEffect, effect.clone());
         }
         for effect in &pending_passive_effects.borrow().update {
             did_flush_passive_effects = true;
-            CommitWork::commit_hook_effect_list_mount(
-                Flags::Passive | Flags::HookHasEffect,
-                effect.clone(),
-            );
+            commit_hook_effect_list_mount(Flags::Passive | Flags::HookHasEffect, effect.clone());
         }
         pending_passive_effects.borrow_mut().update = vec![];
         flush_sync_callbacks();
@@ -398,14 +395,18 @@ fn commit_root(root: Rc<RefCell<FiberRootNode>>) {
             EXECUTION_CONTEXT |= ExecutionContext::CommitContext;
         }
 
-        unsafe {
-            COMMIT_WORK
-                .as_mut()
-                .unwrap()
-                .commit_mutation_effects(finished_work.clone(), root.clone());
-        }
+        // effect
 
+        // 1/3: Before Mutation
+
+        // 2/3: Mutation
+        commit_mutation_effects(finished_work.clone(), root.clone());
+
+        // Switch Fiber Tree
         cloned.borrow_mut().current = finished_work.clone();
+
+        // 3/3: Layout
+        commit_layout_effects(finished_work.clone(), root.clone());
 
         unsafe {
             EXECUTION_CONTEXT = prev_execution_context;
