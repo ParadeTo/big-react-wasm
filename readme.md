@@ -39,3 +39,7 @@
 [从零实现 React v18，但 WASM 版 - [15] 实现 useEffect](https://www.paradeto.com/2024/05/24/big-react-wasm-15/)
 
 [从零实现 React v18，但 WASM 版 - [16] 实现 React Noop](https://www.paradeto.com/2024/06/06/big-react-wasm-16/)
+
+[从零实现 React v18，但 WASM 版 - [17] 实现 Concurrent 模式](https://www.paradeto.com/2024/06/19/big-react-wasm-17/)
+
+[从零实现 React v18，但 WASM 版 - [18] 实现 useRef, useCallback, useMemo](https://www.paradeto.com/2024/07/10/big-react-wasm-18/)
