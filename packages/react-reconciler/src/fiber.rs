@@ -47,6 +47,7 @@ impl MemoizedState {
 
 pub struct FiberNode {
     pub lanes: Lane,
+    pub child_lanes: Lane,
     pub index: u32,
     pub tag: WorkTag,
     pub pending_props: JsValue,
@@ -131,6 +132,7 @@ impl FiberNode {
             subtree_flags: Flags::NoFlags,
             deletions: vec![],
             lanes: Lane::NoLane,
+            child_lanes: Lane::NoLane,
             _ref,
         }
     }
@@ -177,7 +179,7 @@ impl FiberNode {
 
         return if w.is_none() {
             let wip = {
-                let c = c_rc.borrow();
+                let c = { c_rc.borrow() };
                 let mut wip =
                     FiberNode::new(c.tag.clone(), pending_props, c.key.clone(), c._ref.clone());
                 wip._type = c._type.clone();
@@ -186,6 +188,8 @@ impl FiberNode {
                 wip.update_queue = c.update_queue.clone();
                 wip.flags = c.flags.clone();
                 wip.child = c.child.clone();
+                wip.lanes = c.lanes.clone();
+                wip.child_lanes = c.child_lanes.clone();
                 wip.memoized_props = c.memoized_props.clone();
                 wip.memoized_state = c.memoized_state.clone();
                 wip.alternate = Some(current);
@@ -193,8 +197,7 @@ impl FiberNode {
             };
             let wip_rc = Rc::new(RefCell::new(wip));
             {
-                let mut fibler_node = c_rc.borrow_mut();
-                fibler_node.alternate = Some(wip_rc.clone());
+                c_rc.clone().borrow_mut().alternate = Some(wip_rc.clone());
             }
             wip_rc
         } else {
@@ -212,6 +215,8 @@ impl FiberNode {
                 wip.update_queue = c.update_queue.clone();
                 wip.flags = c.flags.clone();
                 wip.child = c.child.clone();
+                wip.lanes = c.lanes.clone();
+                wip.child_lanes = c.child_lanes.clone();
                 wip.memoized_props = c.memoized_props.clone();
                 wip.memoized_state = c.memoized_state.clone();
                 wip._ref = c._ref.clone();

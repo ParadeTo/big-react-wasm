@@ -398,6 +398,28 @@ fn _reconcile_child_fibers(
     delete_remaining_children(return_fiber, current_first_child, should_track_effects)
 }
 
+pub fn clone_child_fiblers(wip: Rc<RefCell<FiberNode>>) {
+    if wip.borrow().child.is_none() {
+        return;
+    }
+
+    let mut current_child = { wip.borrow().child.clone().unwrap() };
+    let pending_props = { current_child.borrow().pending_props.clone() };
+    let mut new_child = FiberNode::create_work_in_progress(current_child.clone(), pending_props);
+    wip.borrow_mut().child = Some(new_child.clone());
+    new_child.borrow_mut()._return = Some(wip);
+
+    while current_child.borrow().sibling.is_some() {
+        let sibling = { current_child.borrow().sibling.clone().unwrap() };
+        let pending_props = { sibling.borrow().pending_props.clone() };
+        let new_slibing = FiberNode::create_work_in_progress(sibling.clone(), pending_props);
+        new_child.borrow_mut().sibling = Some(new_slibing.clone());
+
+        current_child = sibling;
+        new_child = new_slibing;
+    }
+}
+
 pub fn reconcile_child_fibers(
     return_fiber: Rc<RefCell<FiberNode>>,
     current_first_child: Option<Rc<RefCell<FiberNode>>>,

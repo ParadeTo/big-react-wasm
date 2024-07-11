@@ -68,27 +68,26 @@ pub fn mark_update_lane_from_fiber_to_root(
     let mut node = Rc::clone(&fiber);
     let mut parent = Rc::clone(&fiber).borrow()._return.clone();
 
-    let node_lanes = { node.borrow().lanes.clone() };
-    node.borrow_mut().lanes = merge_lanes(node_lanes, lane.clone());
-    let alternate = node.borrow().alternate.clone();
-    if alternate.is_some() {
-        let alternate = alternate.unwrap();
-        let alternate_lanes = { alternate.borrow().lanes.clone() };
-        alternate.borrow_mut().lanes = merge_lanes(alternate_lanes, lane);
-    }
-
     while parent.is_some() {
+        let p = parent.clone().unwrap();
+        let child_lanes = { p.borrow().child_lanes.clone() };
+        p.borrow_mut().child_lanes = merge_lanes(child_lanes, lane.clone());
+
+        let alternate = p.borrow().alternate.clone();
+        if alternate.is_some() {
+            let alternate = alternate.unwrap();
+            let child_lanes = { alternate.borrow().child_lanes.clone() };
+            alternate.borrow_mut().child_lanes = merge_lanes(child_lanes, lane.clone());
+        }
+
         node = parent.clone().unwrap();
-        let rc = Rc::clone(&parent.unwrap());
-        let rc_ref = rc.borrow();
-        let next = match rc_ref._return.as_ref() {
+        parent = match parent.clone().unwrap().borrow()._return.as_ref() {
             None => None,
             Some(node) => {
                 let a = node.clone();
                 Some(a)
             }
         };
-        parent = next;
     }
 
     let fiber_node_rc = Rc::clone(&node);

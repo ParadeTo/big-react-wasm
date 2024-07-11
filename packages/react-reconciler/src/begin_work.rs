@@ -3,21 +3,97 @@ use std::rc::Rc;
 
 use wasm_bindgen::JsValue;
 
-use shared::derive_from_js_value;
+use shared::{derive_from_js_value, is_dev, log};
 use web_sys::js_sys::Object;
 
-use crate::child_fiber::{mount_child_fibers, reconcile_child_fibers};
+use crate::child_fiber::{clone_child_fiblers, mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::render_with_hooks;
-use crate::fiber_lanes::Lane;
+use crate::fiber_lanes::{include_some_lanes, Lane};
 use crate::update_queue::{process_update_queue, ReturnOfProcessUpdateQueue};
 use crate::work_tags::WorkTag;
+
+static mut DID_RECEIVE_UPDATE: bool = false;
+
+pub fn mark_wip_received_update() {
+    unsafe { DID_RECEIVE_UPDATE = true };
+}
+
+fn bailout_on_already_finished_work(
+    wip: Rc<RefCell<FiberNode>>,
+    render_lane: Lane,
+) -> Option<Rc<RefCell<FiberNode>>> {
+    // log!(
+    //     "tag:{:?} child_lanes:{:?} render_lanes:{:?} result:{:?}",
+    //     wip.borrow().tag,
+    //     wip.borrow().child_lanes.clone(),
+    //     render_lane,
+    //     wip.borrow().child_lanes.clone() & render_lane.clone()
+    // );
+    if !include_some_lanes(wip.borrow().child_lanes.clone(), render_lane) {
+        if is_dev() {
+            log!("bailout the whole subtree");
+        }
+        return None;
+    }
+    if is_dev() {
+        log!("bailout current fiber");
+    }
+    clone_child_fiblers(wip.clone());
+    wip.borrow().child.clone()
+}
+
+fn check_scheduled_update_or_context(current: Rc<RefCell<FiberNode>>, render_lane: Lane) -> bool {
+    let update_lanes = current.borrow().lanes.clone();
+    if include_some_lanes(update_lanes, render_lane) {
+        return true;
+    }
+    false
+}
 
 pub fn begin_work(
     work_in_progress: Rc<RefCell<FiberNode>>,
     render_lane: Lane,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
+    unsafe {
+        DID_RECEIVE_UPDATE = false;
+    };
+    let current = work_in_progress.borrow().alternate.clone();
+
+    if current.is_some() {
+        let current = current.unwrap();
+        let old_props = current.borrow().memoized_props.clone();
+        let old_type = current.borrow()._type.clone();
+        let new_props = work_in_progress.borrow().pending_props.clone();
+        let new_type = work_in_progress.borrow()._type.clone();
+        if !Object::is(&old_props, &new_props) || !Object::is(&old_type, &new_type) {
+            unsafe { DID_RECEIVE_UPDATE = true }
+        } else {
+            let has_scheduled_update_or_context =
+                check_scheduled_update_or_context(current.clone(), render_lane.clone());
+            // The current fiber lane is not included in render_lane
+            // TODO context
+            if !has_scheduled_update_or_context {
+                unsafe { DID_RECEIVE_UPDATE = false }
+                // // if current.is_some() {
+                // let c = current.clone();
+                // log!(
+                //     "current tag:{:?} lanes:{:?} child_lanes:{:?} render_lane:{:?}",
+                //     c.borrow().tag,
+                //     c.borrow().lanes,
+                //     c.borrow().child_lanes,
+                //     render_lane
+                // );
+                // // }
+                return Ok(bailout_on_already_finished_work(
+                    work_in_progress,
+                    render_lane,
+                ));
+            }
+        }
+    }
+
     let tag = work_in_progress.clone().borrow().tag.clone();
     return match tag {
         WorkTag::FunctionComponent => {
@@ -34,6 +110,10 @@ fn update_function_component(
     render_lane: Lane,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
     let next_children = render_with_hooks(work_in_progress.clone(), render_lane)?;
+
+    // let current = work_in_progress.borrow().alternate.clone();
+    // if current.is_some()&& !d
+
     reconcile_children(work_in_progress.clone(), Some(next_children));
     Ok(work_in_progress.clone().borrow().child.clone())
 }

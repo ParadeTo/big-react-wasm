@@ -9,7 +9,7 @@ use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_flags::Flags;
-use crate::fiber_lanes::{merge_lanes, request_update_lane, Lane};
+use crate::fiber_lanes::{merge_lanes, remove_lanes, request_update_lane, Lane};
 use crate::update_queue::{
     create_update, create_update_queue, enqueue_update, process_update_queue,
     ReturnOfProcessUpdateQueue, Update, UpdateQueue,
@@ -81,6 +81,13 @@ impl Hook {
             next,
         }
     }
+}
+
+fn bailout_hook(wip: Rc<RefCell<FiberNode>>, render_lane: Lane) {
+    let current = { wip.borrow().alternate.clone().unwrap() };
+    wip.borrow_mut().update_queue = current.borrow().update_queue.clone();
+    wip.borrow_mut().flags -= Flags::PassiveEffect;
+    current.borrow_mut().lanes = remove_lanes(current.borrow().lanes.clone(), render_lane);
 }
 
 fn update_hooks_to_dispatcher(is_update: bool) {
@@ -428,10 +435,8 @@ fn dispatch_set_state(
 ) {
     let lane = request_update_lane();
     let update = create_update(action.clone(), lane.clone());
-    enqueue_update(update_queue.clone(), update);
-    unsafe {
-        schedule_update_on_fiber(fiber.clone(), lane);
-    }
+    enqueue_update(update_queue.clone(), update, fiber.clone(), lane.clone());
+    schedule_update_on_fiber(fiber.clone(), lane);
 }
 
 fn create_fc_update_queue() -> Rc<RefCell<UpdateQueue>> {

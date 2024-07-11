@@ -74,9 +74,12 @@ impl Reconciler {
         let host_root_fiber = Rc::clone(&root).borrow().current.clone();
         let root_render_priority = Lane::SyncLane;
         let update = create_update(element.clone(), root_render_priority.clone());
+        let update_queue = { host_root_fiber.borrow().update_queue.clone().unwrap() };
         enqueue_update(
-            host_root_fiber.borrow().update_queue.clone().unwrap(),
+            update_queue,
             update,
+            host_root_fiber.clone(),
+            root_render_priority.clone(),
         );
         unsafe {
             HOST_CONFIG = Some(self.host_config.clone());

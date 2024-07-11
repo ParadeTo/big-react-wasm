@@ -40,7 +40,12 @@ pub fn create_update(action: JsValue, lane: Lane) -> Update {
     }
 }
 
-pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, mut update: Update) {
+pub fn enqueue_update(
+    update_queue: Rc<RefCell<UpdateQueue>>,
+    mut update: Update,
+    fiber: Rc<RefCell<FiberNode>>,
+    lane: Lane,
+) {
     let pending = update_queue.borrow().shared.pending.clone();
     let update_rc = Rc::new(RefCell::new(update));
     let update_option = Option::from(update_rc.clone());
@@ -52,6 +57,14 @@ pub fn enqueue_update(update_queue: Rc<RefCell<UpdateQueue>>, mut update: Update
         pending.borrow_mut().next = update_option.clone();
     }
     update_queue.borrow_mut().shared.pending = update_option.clone();
+
+    let fiber_lane = { fiber.borrow().lanes.clone() };
+    fiber.borrow_mut().lanes = merge_lanes(fiber_lane, lane.clone());
+    let alternate = fiber.borrow().alternate.clone();
+    if alternate.is_some() {
+        let alternate = alternate.unwrap();
+        alternate.borrow_mut().lanes = merge_lanes(alternate.borrow().lanes.clone(), lane);
+    }
 }
 
 pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
