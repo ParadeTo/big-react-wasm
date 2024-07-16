@@ -141,7 +141,7 @@ fn update_host_root(
 
     {
         let ReturnOfProcessUpdateQueue { memoized_state, .. } =
-            process_update_queue(base_state, pending, render_lane);
+            process_update_queue(base_state, pending, render_lane, None);
         work_in_progress.clone().borrow_mut().memoized_state = memoized_state;
     }
 

@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Array, Function, Object, Reflect};
 
-use shared::log;
+use shared::{is_dev, log};
 
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_flags::Flags;
@@ -342,7 +342,7 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     closure.forget();
 
     queue.clone().borrow_mut().dispatch = Some(function.clone());
-
+    queue.clone().borrow_mut().last_rendered_state = Some(memoized_state.clone());
     Ok(vec![memoized_state, function.into()])
 }
 
@@ -391,26 +391,34 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
             memoized_state,
             base_state: new_base_state,
             base_queue: new_base_queue,
-            skipped_update_lanes,
-        } = process_update_queue(base_state, base_queue, unsafe { RENDER_LANE.clone() });
-        unsafe {
-            let lanes = {
-                CURRENTLY_RENDERING_FIBER
-                    .clone()
-                    .unwrap()
-                    .borrow()
-                    .lanes
-                    .clone()
-            };
-            CURRENTLY_RENDERING_FIBER
-                .clone()
-                .unwrap()
-                .borrow_mut()
-                .lanes = merge_lanes(lanes, skipped_update_lanes)
-        };
-        hook_cloned.borrow_mut().memoized_state = memoized_state;
+        } = process_update_queue(
+            base_state,
+            base_queue,
+            unsafe { RENDER_LANE.clone() },
+            Some(|update: Rc<RefCell<Update>>| {
+                let skipped_lane = update.borrow().lane.clone();
+                let fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap().clone() };
+                let lanes = { fiber.borrow().lanes.clone() };
+                fiber.borrow_mut().lanes = merge_lanes(lanes, skipped_lane);
+            }),
+        );
+
+        // TODO
+
+        // if Object::is(prev_state, memoized:state) {
+        // }
+
+        hook_cloned.borrow_mut().memoized_state = memoized_state.clone();
         hook_cloned.borrow_mut().base_state = new_base_state;
         hook_cloned.borrow_mut().base_queue = new_base_queue;
+
+        queue.clone().unwrap().borrow_mut().last_rendered_state = Some(match memoized_state {
+            Some(m) => match m {
+                MemoizedState::MemoizedJsValue(js_value) => js_value,
+                _ => todo!(),
+            },
+            None => todo!(),
+        });
     }
 
     Ok(vec![
@@ -428,21 +436,49 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     ])
 }
 
+pub fn basic_state_reducer(state: &JsValue, action: &JsValue) -> Result<JsValue, JsValue> {
+    if action.is_function() {
+        let function = action.dyn_ref::<Function>().unwrap();
+        return function.call1(&JsValue::null(), state);
+    }
+    Ok(action.into())
+}
+
 fn dispatch_set_state(
     fiber: Rc<RefCell<FiberNode>>,
     update_queue: Rc<RefCell<UpdateQueue>>,
     action: &JsValue,
 ) {
     let lane = request_update_lane();
-    let update = create_update(action.clone(), lane.clone());
+    let mut update = create_update(action.clone(), lane.clone());
+
+    let current = { fiber.borrow().alternate.clone() };
+    if fiber.borrow().lanes == Lane::NoLane
+        && (current.is_none() || current.unwrap().borrow().lanes == Lane::NoLane)
+    {
+        let current_state = update_queue.borrow().last_rendered_state.clone();
+        if current_state.is_none() {
+            panic!("current state is none")
+        }
+        let current_state = current_state.unwrap();
+        let eager_state = basic_state_reducer(&current_state, &action);
+        // if not ok, the update will be handled in render phase, means the error will be handled in render phase
+        if eager_state.is_ok() {
+            let eager_state = eager_state.unwrap();
+            update.has_eager_state = true;
+            update.eager_state = Some(eager_state.clone());
+            if Object::is(&current_state, &eager_state) {
+                enqueue_update(update_queue.clone(), update, fiber.clone(), lane.clone());
+                if is_dev() {
+                    log!("Hit eager state")
+                }
+                return;
+            }
+        }
+    }
+
     enqueue_update(update_queue.clone(), update, fiber.clone(), lane.clone());
     schedule_update_on_fiber(fiber.clone(), lane);
-}
-
-fn create_fc_update_queue() -> Rc<RefCell<UpdateQueue>> {
-    let update_queue = create_update_queue();
-    update_queue.borrow_mut().last_effect = None;
-    update_queue
 }
 
 fn push_effect(
@@ -457,7 +493,7 @@ fn push_effect(
     let fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap() };
     let update_queue = { fiber.borrow().update_queue.clone() };
     if update_queue.is_none() {
-        let update_queue = create_fc_update_queue();
+        let update_queue = create_update_queue();
         fiber.borrow_mut().update_queue = Some(update_queue.clone());
         effect.borrow_mut().next = Option::from(effect.clone());
         update_queue.borrow_mut().last_effect = Option::from(effect.clone());

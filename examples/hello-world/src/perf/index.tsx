@@ -1,17 +1,17 @@
 import {useState} from 'react'
 
-function Child() {
+function Child({num}) {
   console.log('Child Render')
-  return <div>Child</div>
+  return <div>Child {num}</div>
 }
 
 function Parent() {
-  const [n, setN] = useState(0)
+  const [num, setNum] = useState(0)
   console.log('Parent render')
   return (
-    <div onClick={() => setN(1)}>
-      Parent
-      <Child />
+    <div onClick={() => setNum(1)}>
+      Parent {num}
+      <Child num={num} />
     </div>
   )
 }

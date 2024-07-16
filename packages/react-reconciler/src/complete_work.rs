@@ -139,7 +139,7 @@ impl CompleteWork {
             }
             WorkTag::HostComponent => {
                 if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
-                    log!("update properties");
+                    CompleteWork::mark_update(work_in_progress.clone());
                     let current = current.unwrap();
                     if !Object::is(
                         &current.borrow()._ref,
@@ -175,8 +175,8 @@ impl CompleteWork {
                         &current.clone().unwrap().clone().borrow().memoized_props,
                         "content",
                     );
-                    let new_test = derive_from_js_value(&new_props, "content");
-                    if !Object::is(&old_text, &new_test) {
+                    let new_text = derive_from_js_value(&new_props, "content");
+                    if !Object::is(&old_text, &new_text) {
                         CompleteWork::mark_update(work_in_progress.clone());
                     }
                 } else {
