@@ -7,7 +7,7 @@ use web_sys::js_sys::Function;
 use shared::log;
 
 use crate::fiber::{FiberNode, MemoizedState};
-use crate::fiber_hooks::Effect;
+use crate::fiber_hooks::{basic_state_reducer, Effect};
 use crate::fiber_lanes::{is_subset_of_lanes, merge_lanes, Lane};
 
 #[derive(Clone, Debug)]
@@ -18,6 +18,8 @@ pub struct Update {
     pub action: Option<JsValue>,
     pub lane: Lane,
     pub next: Option<Rc<RefCell<Update>>>,
+    pub has_eager_state: bool,
+    pub eager_state: Option<JsValue>,
 }
 
 #[derive(Clone, Debug)]
@@ -30,6 +32,7 @@ pub struct UpdateQueue {
     pub shared: UpdateType,
     pub dispatch: Option<Function>,
     pub last_effect: Option<Rc<RefCell<Effect>>>,
+    pub last_rendered_state: Option<JsValue>,
 }
 
 pub fn create_update(action: JsValue, lane: Lane) -> Update {
@@ -37,6 +40,8 @@ pub fn create_update(action: JsValue, lane: Lane) -> Update {
         action: Some(action),
         lane,
         next: None,
+        has_eager_state: false,
+        eager_state: None,
     }
 }
 
@@ -73,6 +78,7 @@ pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
         shared: UpdateType { pending: None },
         dispatch: None,
         last_effect: None,
+        last_rendered_state: None,
     }))
 }
 
@@ -80,32 +86,35 @@ pub struct ReturnOfProcessUpdateQueue {
     pub memoized_state: Option<MemoizedState>,
     pub base_state: Option<MemoizedState>,
     pub base_queue: Option<Rc<RefCell<Update>>>,
-    pub skipped_update_lanes: Lane,
 }
 
 pub fn process_update_queue(
     base_state: Option<MemoizedState>,
     pending_update: Option<Rc<RefCell<Update>>>,
     render_lanes: Lane,
+    on_skip_update: Option<fn(update: Rc<RefCell<Update>>) -> ()>,
 ) -> ReturnOfProcessUpdateQueue {
     let mut result = ReturnOfProcessUpdateQueue {
         memoized_state: base_state.clone(),
         base_state: base_state.clone(),
         base_queue: None,
-        skipped_update_lanes: Lane::NoLane,
     };
 
     if pending_update.is_some() {
-        let mut update_option = pending_update.clone();
+        let update_option = pending_update.clone().unwrap();
+        let first = update_option.borrow().next.clone();
+        let mut pending = update_option.borrow().next.clone();
+
         // 更新后的baseState（有跳过情况下与memoizedState不同）
-        let mut new_base_state: Option<MemoizedState> = base_state;
+        let mut new_base_state: Option<MemoizedState> = base_state.clone();
         // 更新后的baseQueue第一个节点
         let mut new_base_queue_first: Option<Rc<RefCell<Update>>> = None;
         // 更新后的baseQueue最后一个节点
         let mut new_base_queue_last: Option<Rc<RefCell<Update>>> = None;
+        let mut new_state = base_state.clone();
 
         loop {
-            let mut update = update_option.clone().unwrap();
+            let mut update = pending.clone().unwrap();
             let update_lane = update.borrow().lane.clone();
             if !is_subset_of_lanes(render_lanes.clone(), update_lane.clone()) {
                 // underpriority
@@ -113,6 +122,12 @@ pub fn process_update_queue(
                     update.borrow().action.clone().unwrap(),
                     update_lane.clone(),
                 )));
+
+                if on_skip_update.is_some() {
+                    let function = on_skip_update.unwrap();
+                    function(clone.clone());
+                }
+
                 if new_base_queue_last.is_none() {
                     new_base_queue_first = Some(clone.clone());
                     new_base_queue_last = Some(clone.clone());
@@ -120,7 +135,6 @@ pub fn process_update_queue(
                 } else {
                     new_base_queue_last.clone().unwrap().borrow_mut().next = Some(clone.clone());
                 }
-                result.skipped_update_lanes = merge_lanes(result.skipped_update_lanes, update_lane);
             } else {
                 if new_base_queue_last.is_some() {
                     let clone = Rc::new(RefCell::new(create_update(
@@ -131,38 +145,86 @@ pub fn process_update_queue(
                     new_base_queue_last = Some(clone.clone())
                 }
 
-                result.memoized_state = match update.borrow().action.clone() {
-                    None => None,
-                    Some(action) => {
-                        let f = action.dyn_ref::<Function>();
-                        match f {
-                            None => Some(MemoizedState::MemoizedJsValue(action.clone())),
-                            Some(f) => match result.memoized_state.as_ref() {
-                                Some(memoized_state) => {
-                                    if let MemoizedState::MemoizedJsValue(base_state) =
-                                        memoized_state
-                                    {
-                                        Some(MemoizedState::MemoizedJsValue(
-                                            f.call1(&JsValue::null(), base_state).unwrap(),
-                                        ))
-                                    } else {
-                                        log!("process_update_queue, base_state is not JsValue");
-                                        None
+                if update.borrow().has_eager_state {
+                    new_state = Some(MemoizedState::MemoizedJsValue(
+                        update.borrow().eager_state.clone().unwrap(),
+                    ));
+                } else {
+                    // let b = match base_state.clone() {
+                    //     Some(s) => match s {
+                    //         MemoizedState::MemoizedJsValue(js_value) => Some(js_value),
+                    //         _ => None,
+                    //     },
+                    //     None => None,
+                    // };
+                    // new_state = if b.is_none() {
+                    //     None
+                    // } else {
+                    //     Some(MemoizedState::MemoizedJsValue(
+                    //         basic_state_reducer(
+                    //             b.as_ref().unwrap(),
+                    //             &update.borrow().action.clone().unwrap(),
+                    //         )
+                    //         .unwrap(),
+                    //     ))
+                    // };
+                    new_state = match update.borrow().action.clone() {
+                        None => None,
+                        Some(action) => {
+                            let f = action.dyn_ref::<Function>();
+                            match f {
+                                None => Some(MemoizedState::MemoizedJsValue(action.clone())),
+                                Some(f) => match result.memoized_state.as_ref() {
+                                    Some(memoized_state) => {
+                                        if let MemoizedState::MemoizedJsValue(base_state) =
+                                            memoized_state
+                                        {
+                                            Some(MemoizedState::MemoizedJsValue(
+                                                f.call1(&JsValue::null(), base_state).unwrap(),
+                                            ))
+                                        } else {
+                                            log!("process_update_queue, base_state is not JsValue");
+                                            None
+                                        }
                                     }
-                                }
-                                None => Some(MemoizedState::MemoizedJsValue(
-                                    f.call1(&JsValue::null(), &JsValue::undefined()).unwrap(),
-                                )),
-                            },
+                                    None => Some(MemoizedState::MemoizedJsValue(
+                                        f.call1(&JsValue::null(), &JsValue::undefined()).unwrap(),
+                                    )),
+                                },
+                            }
                         }
-                    }
-                };
+                    };
+                }
+
+                // result.memoized_state = match update.borrow().action.clone() {
+                //     None => None,
+                //     Some(action) => {
+                //         let f = action.dyn_ref::<Function>();
+                //         match f {
+                //             None => Some(MemoizedState::MemoizedJsValue(action.clone())),
+                //             Some(f) => match result.memoized_state.as_ref() {
+                //                 Some(memoized_state) => {
+                //                     if let MemoizedState::MemoizedJsValue(base_state) =
+                //                         memoized_state
+                //                     {
+                //                         Some(MemoizedState::MemoizedJsValue(
+                //                             f.call1(&JsValue::null(), base_state).unwrap(),
+                //                         ))
+                //                     } else {
+                //                         log!("process_update_queue, base_state is not JsValue");
+                //                         None
+                //                     }
+                //                 }
+                //                 None => Some(MemoizedState::MemoizedJsValue(
+                //                     f.call1(&JsValue::null(), &JsValue::undefined()).unwrap(),
+                //                 )),
+                //             },
+                //         }
+                //     }
+                // };
             }
-            update_option = update.clone().borrow().next.clone();
-            if Rc::ptr_eq(
-                &update_option.clone().unwrap(),
-                &pending_update.clone().unwrap(),
-            ) {
+            pending = update.clone().borrow().next.clone();
+            if Rc::ptr_eq(&pending.clone().unwrap(), &first.clone().unwrap()) {
                 break;
             }
         }
@@ -173,6 +235,7 @@ pub fn process_update_queue(
             new_base_queue_last.clone().unwrap().borrow_mut().next = new_base_queue_last.clone();
         }
 
+        result.memoized_state = new_state;
         result.base_state = new_base_state;
         result.base_queue = new_base_queue_last.clone();
     }

@@ -9,7 +9,7 @@ use web_sys::js_sys::Object;
 use crate::child_fiber::{clone_child_fiblers, mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_flags::Flags;
-use crate::fiber_hooks::render_with_hooks;
+use crate::fiber_hooks::{bailout_hook, render_with_hooks};
 use crate::fiber_lanes::{include_some_lanes, Lane};
 use crate::update_queue::{process_update_queue, ReturnOfProcessUpdateQueue};
 use crate::work_tags::WorkTag;
@@ -94,6 +94,8 @@ pub fn begin_work(
         }
     }
 
+    work_in_progress.borrow_mut().lanes = Lane::NoLane;
+
     let tag = work_in_progress.clone().borrow().tag.clone();
     return match tag {
         WorkTag::FunctionComponent => {
@@ -109,10 +111,16 @@ fn update_function_component(
     work_in_progress: Rc<RefCell<FiberNode>>,
     render_lane: Lane,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
-    let next_children = render_with_hooks(work_in_progress.clone(), render_lane)?;
+    let next_children = render_with_hooks(work_in_progress.clone(), render_lane.clone())?;
 
-    // let current = work_in_progress.borrow().alternate.clone();
-    // if current.is_some()&& !d
+    let current = work_in_progress.borrow().alternate.clone();
+    if current.is_some() && unsafe { !DID_RECEIVE_UPDATE } {
+        bailout_hook(work_in_progress.clone(), render_lane.clone());
+        return Ok(bailout_on_already_finished_work(
+            work_in_progress,
+            render_lane,
+        ));
+    }
 
     reconcile_children(work_in_progress.clone(), Some(next_children));
     Ok(work_in_progress.clone().borrow().child.clone())
@@ -141,7 +149,7 @@ fn update_host_root(
 
     {
         let ReturnOfProcessUpdateQueue { memoized_state, .. } =
-            process_update_queue(base_state, pending, render_lane);
+            process_update_queue(base_state, pending, render_lane, None);
         work_in_progress.clone().borrow_mut().memoized_state = memoized_state;
     }
 

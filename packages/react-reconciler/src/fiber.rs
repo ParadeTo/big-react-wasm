@@ -73,10 +73,11 @@ impl Debug for FiberNode {
             WorkTag::FunctionComponent => {
                 write!(
                     f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?})",
+                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
                     self._type.as_ref(),
                     self.flags,
-                    self.subtree_flags
+                    self.subtree_flags,
+                    self.lanes
                 )
                 .expect("print error");
             }

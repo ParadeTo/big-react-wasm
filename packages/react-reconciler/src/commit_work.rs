@@ -222,7 +222,11 @@ fn commit_mutation_effects_on_fiber(
         finished_work.borrow_mut().flags -= Flags::ChildDeletion;
     }
 
-    log!("finished_work {:?}", finished_work);
+    // log!(
+    //     "finished_work {:?} {:?}",
+    //     finished_work,
+    //     finished_work.borrow().alternate
+    // );
     if flags.contains(Flags::Update) {
         commit_update(finished_work.clone());
         finished_work.borrow_mut().flags -= Flags::Update;
