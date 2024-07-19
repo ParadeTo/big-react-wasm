@@ -1,27 +1,27 @@
 import {useState} from 'react'
 
-function Child() {
+function Child({num}) {
   console.log('Child Render')
-  return <div>Child</div>
+  return <div>Child {num}</div>
 }
 
-function Parent() {
-  const [n, setN] = useState(0)
+export default function Parent() {
+  const [num, setNum] = useState(1)
   console.log('Parent render')
   return (
-    <div onClick={() => setN(1)}>
-      Parent
-      <Child />
+    <div onClick={() => setNum(2)}>
+      Parent {num}
+      <Child num={num} />
     </div>
   )
 }
 
-export default function App() {
-  console.log('App render')
-  return (
-    <div>
-      App
-      <Parent />
-    </div>
-  )
-}
+// export default function App() {
+//   console.log('App render')
+//   return (
+//     <div>
+//       App
+//       <Parent />
+//     </div>
+//   )
+// }

@@ -212,7 +212,7 @@ fn update_from_map(
     should_track_effects: bool,
 ) -> Option<Rc<RefCell<FiberNode>>> {
     let key_to_use;
-    if type_of(element, "string") || type_of(element, "null") {
+    if type_of(element, "string") || type_of(element, "null") || type_of(element, "number") {
         key_to_use = JsValue::from(index);
     } else {
         let key = derive_from_js_value(element, "key");
@@ -268,7 +268,6 @@ fn update_from_map(
             element,
         ))));
     }
-    // panic!("update_from_map unsupported");
     None
 }
 
