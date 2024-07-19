@@ -222,6 +222,7 @@ fn commit_mutation_effects_on_fiber(
         finished_work.borrow_mut().flags -= Flags::ChildDeletion;
     }
 
+    log!("finished_work {:?}", finished_work);
     if flags.contains(Flags::Update) {
         commit_update(finished_work.clone());
         finished_work.borrow_mut().flags -= Flags::Update;
@@ -285,6 +286,7 @@ fn commit_update(finished_work: Rc<RefCell<FiberNode>>) {
         WorkTag::HostText => {
             let new_content = derive_from_js_value(&cloned.borrow().pending_props, "content");
             let state_node = FiberNode::derive_state_node(finished_work.clone());
+            log!("commit_update {:?} {:?}", state_node, new_content);
             if let Some(state_node) = state_node.clone() {
                 unsafe {
                     HOST_CONFIG

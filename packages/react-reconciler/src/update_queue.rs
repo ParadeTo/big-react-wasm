@@ -63,7 +63,8 @@ pub fn enqueue_update(
     let alternate = fiber.borrow().alternate.clone();
     if alternate.is_some() {
         let alternate = alternate.unwrap();
-        alternate.borrow_mut().lanes = merge_lanes(alternate.borrow().lanes.clone(), lane);
+        let lanes = { alternate.borrow().lanes.clone() };
+        alternate.borrow_mut().lanes = merge_lanes(lanes, lane);
     }
 }
 

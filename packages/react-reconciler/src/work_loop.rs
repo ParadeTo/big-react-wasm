@@ -489,7 +489,7 @@ fn complete_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {
             }
 
             let _return = node.clone().unwrap().clone().borrow()._return.clone();
-
+            // log!("complete_unit_of_work {:?} {:?}", node, _return);
             if _return.is_none() {
                 // node = None;
                 // self.work_in_progress = None;

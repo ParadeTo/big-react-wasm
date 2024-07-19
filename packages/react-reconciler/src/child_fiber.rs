@@ -182,6 +182,7 @@ fn reconcile_single_text_node(
     Rc::new(RefCell::new(created))
 }
 
+#[derive(Clone, Debug)]
 struct Key(JsValue);
 
 impl PartialEq for Key {
@@ -224,6 +225,7 @@ fn update_from_map(
     let before = existing_children.get(&Key(key_to_use.clone())).clone();
     if type_of(element, "null") || type_of(element, "string") || type_of(element, "number") {
         let props = create_props_with_content(element.clone());
+        // log!("update_from_map {:?}", props);
         if before.is_some() {
             let before = (*before.clone().unwrap()).clone();
             existing_children.remove(&Key(key_to_use.clone()));
@@ -295,10 +297,11 @@ fn reconcile_children_array(
         existing_children.insert(Key(key_to_use), current_rc.clone());
         current = current_rc.borrow().sibling.clone();
     }
-
+    // log!("existing_children {:?}", existing_children.keys());
     let length = new_child.length();
     for i in 0..length {
         let after = new_child.get(i);
+        // log!("after {:?}", after);
         let new_fiber = update_from_map(
             return_fiber.clone(),
             &mut existing_children,
@@ -306,7 +309,7 @@ fn reconcile_children_array(
             &after,
             should_track_effects,
         );
-
+        // log!("new_fiber {:?}", new_fiber);
         if new_fiber.is_none() {
             continue;
         }
@@ -347,7 +350,11 @@ fn reconcile_children_array(
     for (_, fiber) in existing_children {
         delete_child(return_fiber.clone(), fiber, should_track_effects);
     }
-
+    log!(
+        "first_new_fiber {:?} {:?}",
+        first_new_fiber,
+        first_new_fiber.clone().unwrap().borrow().sibling
+    );
     first_new_fiber
 }
 
@@ -406,12 +413,19 @@ pub fn clone_child_fiblers(wip: Rc<RefCell<FiberNode>>) {
     let pending_props = { current_child.borrow().pending_props.clone() };
     let mut new_child = FiberNode::create_work_in_progress(current_child.clone(), pending_props);
     wip.borrow_mut().child = Some(new_child.clone());
-    new_child.borrow_mut()._return = Some(wip);
+    new_child.borrow_mut()._return = Some(wip.clone());
 
     while current_child.borrow().sibling.is_some() {
         let sibling = { current_child.borrow().sibling.clone().unwrap() };
         let pending_props = { sibling.borrow().pending_props.clone() };
         let new_slibing = FiberNode::create_work_in_progress(sibling.clone(), pending_props);
+        new_slibing.borrow_mut()._return = Some(wip.clone());
+        // log!(
+        //     "new {:?} {:?} {:?}",
+        //     new_slibing,
+        //     new_slibing.borrow()._return,
+        //     sibling.borrow()._return
+        // );
         new_child.borrow_mut().sibling = Some(new_slibing.clone());
 
         current_child = sibling;

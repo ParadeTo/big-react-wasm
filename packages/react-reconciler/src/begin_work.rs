@@ -33,12 +33,12 @@ fn bailout_on_already_finished_work(
     // );
     if !include_some_lanes(wip.borrow().child_lanes.clone(), render_lane) {
         if is_dev() {
-            log!("bailout the whole subtree");
+            log!("bailout the whole subtree {:?}", wip);
         }
         return None;
     }
     if is_dev() {
-        log!("bailout current fiber");
+        log!("bailout current fiber {:?}", wip);
     }
     clone_child_fiblers(wip.clone());
     wip.borrow().child.clone()
