@@ -9,6 +9,7 @@ use shared::{derive_from_js_value, log};
 
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_flags::Flags;
+use crate::fiber_lanes::{merge_lanes, Lane};
 use crate::work_tags::WorkTag;
 use crate::HostConfig;
 
@@ -97,14 +98,24 @@ impl CompleteWork {
 
     fn bubble_properties(&self, complete_work: Rc<RefCell<FiberNode>>) {
         let mut subtree_flags = Flags::NoFlags;
+        let mut new_child_lanes = Lane::NoLane;
         {
             let mut child = complete_work.clone().borrow().child.clone();
+
             while child.is_some() {
                 let child_rc = child.clone().unwrap().clone();
                 {
                     let child_borrowed = child_rc.borrow();
                     subtree_flags |= child_borrowed.subtree_flags.clone();
                     subtree_flags |= child_borrowed.flags.clone();
+
+                    new_child_lanes = merge_lanes(
+                        new_child_lanes,
+                        merge_lanes(
+                            child_borrowed.lanes.clone(),
+                            child_borrowed.child_lanes.clone(),
+                        ),
+                    )
                 }
                 {
                     child_rc.borrow_mut()._return = Some(complete_work.clone());
@@ -114,6 +125,7 @@ impl CompleteWork {
         }
 
         complete_work.clone().borrow_mut().subtree_flags |= subtree_flags.clone();
+        complete_work.clone().borrow_mut().child_lanes |= new_child_lanes.clone();
     }
 
     fn mark_update(fiber: Rc<RefCell<FiberNode>>) {
@@ -131,15 +143,18 @@ impl CompleteWork {
         match tag {
             WorkTag::FunctionComponent => {
                 self.bubble_properties(work_in_progress.clone());
+                // log!("bubble_properties function {:?}", work_in_progress.clone());
                 None
             }
             WorkTag::HostRoot => {
                 self.bubble_properties(work_in_progress.clone());
+                // log!("bubble_properties HostRoot {:?}", work_in_progress.clone());
                 None
             }
             WorkTag::HostComponent => {
                 if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
-                    log!("update properties");
+                    // todo compare
+                    // CompleteWork::mark_update(work_in_progress.clone());
                     let current = current.unwrap();
                     if !Object::is(
                         &current.borrow()._ref,
@@ -167,6 +182,10 @@ impl CompleteWork {
                 }
 
                 self.bubble_properties(work_in_progress.clone());
+                // log!(
+                //     "bubble_properties HostComponent {:?}",
+                //     work_in_progress.clone()
+                // );
                 None
             }
             WorkTag::HostText => {
@@ -175,8 +194,14 @@ impl CompleteWork {
                         &current.clone().unwrap().clone().borrow().memoized_props,
                         "content",
                     );
-                    let new_test = derive_from_js_value(&new_props, "content");
-                    if !Object::is(&old_text, &new_test) {
+                    let new_text = derive_from_js_value(&new_props, "content");
+                    // log!(
+                    //     "complete host {:?} {:?} {:?}",
+                    //     work_in_progress_cloned,
+                    //     old_text,
+                    //     new_text
+                    // );
+                    if !Object::is(&old_text, &new_text) {
                         CompleteWork::mark_update(work_in_progress.clone());
                     }
                 } else {

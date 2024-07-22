@@ -60,3 +60,11 @@ pub fn lanes_to_scheduler_priority(lanes: Lane) -> Priority {
     }
     Priority::IdlePriority
 }
+
+pub fn include_some_lanes(set: Lane, subset: Lane) -> bool {
+    return (set & subset) != Lane::NoLane;
+}
+
+pub fn remove_lanes(set: Lane, subset: Lane) -> Lane {
+    return set - subset;
+}
