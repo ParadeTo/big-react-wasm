@@ -488,7 +488,7 @@ fn dispatch_set_state(
             update.has_eager_state = true;
             update.eager_state = Some(eager_state.clone());
             if Object::is(&current_state, &eager_state) {
-                enqueue_update(update_queue.clone(), update, fiber.clone(), lane.clone());
+                enqueue_update(update_queue.clone(), update, fiber.clone(), Lane::NoLane);
                 if is_dev() {
                     log!("Hit eager state")
                 }
