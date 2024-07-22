@@ -59,10 +59,10 @@ pub fn begin_work(
     unsafe {
         DID_RECEIVE_UPDATE = false;
     };
-    let current = work_in_progress.borrow().alternate.clone();
+    let current = { work_in_progress.borrow().alternate.clone() };
 
     if current.is_some() {
-        let current = current.unwrap();
+        let current = current.clone().unwrap();
         let old_props = current.borrow().memoized_props.clone();
         let old_type = current.borrow()._type.clone();
         let new_props = work_in_progress.borrow().pending_props.clone();
@@ -95,6 +95,10 @@ pub fn begin_work(
     }
 
     work_in_progress.borrow_mut().lanes = Lane::NoLane;
+    if current.is_some() {
+        let current = current.clone().unwrap();
+        current.borrow_mut().lanes = Lane::NoLane;
+    }
 
     let tag = work_in_progress.clone().borrow().tag.clone();
     return match tag {
