@@ -677,14 +677,15 @@ fn update_memo(create: Function, deps: JsValue) -> Result<JsValue, JsValue> {
         deps
     };
 
-    if let MemoizedState::MemoizedJsValue(prev_state) = hook
-        .clone()
-        .unwrap()
-        .borrow()
-        .memoized_state
-        .as_ref()
-        .unwrap()
-    {
+    let memoized_state = {
+        hook.clone()
+            .unwrap()
+            .borrow()
+            .memoized_state
+            .clone()
+            .unwrap()
+    };
+    if let MemoizedState::MemoizedJsValue(prev_state) = memoized_state {
         if !next_deps.is_null() {
             let arr = prev_state.dyn_ref::<Array>().unwrap();
             let prev_deps = arr.get(1);
