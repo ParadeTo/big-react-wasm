@@ -8,6 +8,7 @@ use web_sys::js_sys::Object;
 
 use crate::child_fiber::{clone_child_fiblers, mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
+use crate::fiber_context::push_provider;
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::{bailout_hook, render_with_hooks};
 use crate::fiber_lanes::{include_some_lanes, Lane};
@@ -108,7 +109,20 @@ pub fn begin_work(
         WorkTag::HostRoot => Ok(update_host_root(work_in_progress.clone(), render_lane)),
         WorkTag::HostComponent => Ok(update_host_component(work_in_progress.clone())),
         WorkTag::HostText => Ok(None),
+        WorkTag::ContextProvider => Ok(update_context_provider(work_in_progress.clone())),
     };
+}
+
+fn update_context_provider(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+) -> Option<Rc<RefCell<FiberNode>>> {
+    let provider_type = { work_in_progress.borrow()._type.clone() };
+    let context = derive_from_js_value(&provider_type, "_context");
+    let new_props = { work_in_progress.borrow().pending_props.clone() };
+    push_provider(&context, derive_from_js_value(&new_props, "value"));
+    let next_children = derive_from_js_value(&new_props, "children");
+    reconcile_children(work_in_progress.clone(), Some(next_children));
+    work_in_progress.clone().borrow().child.clone()
 }
 
 fn update_function_component(

@@ -9,7 +9,7 @@ use scheduler::Task;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::{derive_from_js_value, log, type_of};
+use shared::{derive_from_js_value, log, type_of, REACT_PROVIDER_TYPE};
 
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::{Effect, Hook};
@@ -109,6 +109,17 @@ impl Debug for FiberNode {
                 )
                 .expect("print error");
             }
+            WorkTag::ContextProvider => {
+                write!(
+                    f,
+                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
+                    self._type.as_ref(),
+                    self.flags,
+                    self.subtree_flags,
+                    self.lanes
+                )
+                .expect("print error");
+            }
         })
     }
 }
@@ -147,6 +158,10 @@ impl FiberNode {
         let mut fiber_tag = WorkTag::FunctionComponent;
         if _type.is_string() {
             fiber_tag = WorkTag::HostComponent
+        } else if type_of(&_type, "object")
+            && derive_from_js_value(&_type, "$$typeof") == REACT_PROVIDER_TYPE
+        {
+            fiber_tag = WorkTag::ContextProvider;
         } else if !type_of(&_type, "function") {
             log!("Unsupported type {:?}", ele);
         }

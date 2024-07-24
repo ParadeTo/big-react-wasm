@@ -8,6 +8,7 @@ use web_sys::js_sys::{Object, Reflect};
 use shared::{derive_from_js_value, log};
 
 use crate::fiber::{FiberNode, StateNode};
+use crate::fiber_context::pop_provider;
 use crate::fiber_flags::Flags;
 use crate::fiber_lanes::{merge_lanes, Lane};
 use crate::work_tags::WorkTag;
@@ -100,7 +101,7 @@ impl CompleteWork {
         let mut subtree_flags = Flags::NoFlags;
         let mut new_child_lanes = Lane::NoLane;
         {
-            let mut child = complete_work.clone().borrow().child.clone();
+            let mut child = { complete_work.clone().borrow().child.clone() };
 
             while child.is_some() {
                 let child_rc = child.clone().unwrap().clone();
@@ -123,7 +124,6 @@ impl CompleteWork {
                 child = child_rc.borrow().sibling.clone();
             }
         }
-
         complete_work.clone().borrow_mut().subtree_flags |= subtree_flags.clone();
         complete_work.clone().borrow_mut().child_lanes |= new_child_lanes.clone();
     }
@@ -212,6 +212,13 @@ impl CompleteWork {
                         Some(Rc::new(StateNode::Element(text_instance.clone())));
                 }
 
+                self.bubble_properties(work_in_progress.clone());
+                None
+            }
+            WorkTag::ContextProvider => {
+                let _type = { work_in_progress.borrow()._type.clone() };
+                let context = derive_from_js_value(&_type, "_context");
+                pop_provider(&context);
                 self.bubble_properties(work_in_progress.clone());
                 None
             }

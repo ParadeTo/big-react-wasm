@@ -1,7 +1,7 @@
 use js_sys::{Array, Object, Reflect, JSON};
 use wasm_bindgen::prelude::*;
 
-use shared::{derive_from_js_value, REACT_ELEMENT_TYPE};
+use shared::{derive_from_js_value, REACT_CONTEXT_TYPE, REACT_ELEMENT_TYPE, REACT_PROVIDER_TYPE};
 
 use crate::current_dispatcher::CURRENT_DISPATCHER;
 
@@ -139,4 +139,30 @@ pub unsafe fn use_memo(create: &JsValue, deps: &JsValue) -> Result<JsValue, JsVa
 pub unsafe fn use_callback(callback: &JsValue, deps: &JsValue) -> Result<JsValue, JsValue> {
     let use_callback = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_callback;
     use_callback.call2(&JsValue::null(), callback, deps)
+}
+
+#[wasm_bindgen(js_name = useContext)]
+pub unsafe fn use_context(context: &JsValue) -> Result<JsValue, JsValue> {
+    let use_context = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_context;
+    use_context.call1(&JsValue::null(), context)
+}
+
+#[wasm_bindgen(js_name = createContext)]
+pub unsafe fn create_context(default_value: &JsValue) -> JsValue {
+    let context = Object::new();
+    Reflect::set(
+        &context,
+        &"$$typeof".into(),
+        &JsValue::from_str(REACT_CONTEXT_TYPE),
+    );
+    Reflect::set(&context, &"_currentValue".into(), default_value);
+    let provider = Object::new();
+    Reflect::set(
+        &provider,
+        &"$$typeof".into(),
+        &JsValue::from_str(REACT_PROVIDER_TYPE),
+    );
+    Reflect::set(&provider, &"_context".into(), &context);
+    Reflect::set(&context, &"Provider".into(), &provider);
+    context.into()
 }
