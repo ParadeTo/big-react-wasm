@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use shared::derive_from_js_value;
+use shared::{derive_from_js_value, log};
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::{Object, Reflect};
 
@@ -15,7 +15,7 @@ static mut PREV_CONTEXT_VALUE: JsValue = JsValue::null();
 static mut PREV_CONTEXT_VALUE_STACK: Vec<JsValue> = vec![];
 static mut LAST_CONTEXT_DEP: Option<Rc<RefCell<ContextItem>>> = None;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ContextItem {
     context: JsValue,
     memoized_state: JsValue,
@@ -45,14 +45,15 @@ pub fn pop_provider(context: &JsValue) {
 pub fn prepare_to_read_context(wip: Rc<RefCell<FiberNode>>, render_lane: Lane) {
     unsafe { LAST_CONTEXT_DEP = None };
 
-    let deps = { wip.borrow_mut().dependencies.clone() };
+    let deps = { wip.borrow().dependencies.clone() };
+
     if deps.is_some() {
-        let mut deps = deps.unwrap();
-        if deps.first_context.is_some() {
-            if include_some_lanes(deps.lanes, render_lane) {
+        let deps = deps.unwrap();
+        if deps.borrow().first_context.is_some() {
+            if include_some_lanes(deps.borrow().lanes.clone(), render_lane) {
                 mark_wip_received_update()
             }
-            deps.first_context = None;
+            deps.borrow_mut().first_context = None;
         }
     }
 }
@@ -83,7 +84,6 @@ pub fn read_context(consumer: Option<Rc<RefCell<FiberNode>>>, context: JsValue) 
             LAST_CONTEXT_DEP = next;
         }
     }
-
     value
 }
 
@@ -96,12 +96,12 @@ pub fn propagate_context_change(wip: Rc<RefCell<FiberNode>>, context: JsValue, r
 
     while fiber.is_some() {
         let mut next_fiber = None;
-        let fiber_unwrapped = fiber.unwrap();
+        let fiber_unwrapped = fiber.clone().unwrap();
         let deps = { fiber_unwrapped.borrow().dependencies.clone() };
         if deps.is_some() {
             let deps = deps.unwrap();
-            next_fiber = { fiber_unwrapped.borrow().child.clone() };
-            let mut context_item = deps.borrow().first_context;
+            next_fiber = fiber_unwrapped.borrow().child.clone();
+            let mut context_item = deps.borrow().first_context.clone();
             while context_item.is_some() {
                 let context_item_unwrapped = context_item.unwrap();
                 if Object::is(&context_item_unwrapped.borrow().context, &context) {
@@ -124,7 +124,7 @@ pub fn propagate_context_change(wip: Rc<RefCell<FiberNode>>, context: JsValue, r
                     deps.borrow_mut().lanes = merge_lanes(lanes, render_lane.clone());
                     break;
                 }
-                context_item = context_item_unwrapped.borrow().next;
+                context_item = context_item_unwrapped.borrow().next.clone();
             }
         } else if fiber_unwrapped.borrow().tag == WorkTag::ContextProvider {
             /*
@@ -147,10 +147,10 @@ pub fn propagate_context_change(wip: Rc<RefCell<FiberNode>>, context: JsValue, r
         }
 
         if next_fiber.is_some() {
-            next_fiber.unwrap().borrow_mut()._return = fiber;
+            next_fiber.clone().unwrap().borrow_mut()._return = fiber;
         } else {
             // Leaf Node
-            next_fiber = fiber;
+            next_fiber = fiber.clone();
             while next_fiber.is_some() {
                 let next_fiber_unwrapped = next_fiber.unwrap();
                 if Rc::ptr_eq(&next_fiber_unwrapped, &wip) {
@@ -158,18 +158,19 @@ pub fn propagate_context_change(wip: Rc<RefCell<FiberNode>>, context: JsValue, r
                     break;
                 }
 
-                let sibling = next_fiber_unwrapped.borrow().sibling;
+                let sibling = next_fiber_unwrapped.borrow().sibling.clone();
                 if sibling.is_some() {
-                    let sibling_unwrapped = sibling.unwrap();
-                    sibling_unwrapped.borrow_mut()._return = next_fiber_unwrapped.borrow()._return;
-                    next_fiber = sibling;
+                    let sibling_unwrapped = sibling.clone().unwrap();
+                    sibling_unwrapped.borrow_mut()._return =
+                        next_fiber_unwrapped.borrow()._return.clone();
+                    next_fiber = sibling.clone();
                     break;
                 }
-                next_fiber = next_fiber_unwrapped.borrow()._return;
+                next_fiber = next_fiber_unwrapped.borrow()._return.clone();
             }
         }
 
-        fiber = next_fiber;
+        fiber = next_fiber.clone();
     }
 }
 
@@ -182,23 +183,24 @@ fn schedule_context_work_on_parent_path(
 
     while node.is_some() {
         let node_unwrapped = node.unwrap();
-        let alternate = { node_unwrapped.borrow().alternate };
+        let alternate = { node_unwrapped.borrow().alternate.clone() };
         let child_lanes = { node_unwrapped.borrow().child_lanes.clone() };
 
-        if !is_subset_of_lanes(child_lanes, render_lane) {
-            node_unwrapped.borrow_mut().child_lanes = merge_lanes(child_lanes, render_lane);
+        if !is_subset_of_lanes(child_lanes.clone(), render_lane.clone()) {
+            node_unwrapped.borrow_mut().child_lanes =
+                merge_lanes(child_lanes.clone(), render_lane.clone());
             if alternate.is_some() {
                 let alternate_unwrapped = alternate.unwrap();
                 let child_lanes = { alternate_unwrapped.borrow().child_lanes.clone() };
                 alternate_unwrapped.borrow_mut().child_lanes =
-                    merge_lanes(child_lanes, render_lane);
+                    merge_lanes(child_lanes.clone(), render_lane.clone());
             }
         } else if alternate.is_some() {
             let alternate_unwrapped = alternate.unwrap();
             let child_lanes = { alternate_unwrapped.borrow().child_lanes.clone() };
-            if !is_subset_of_lanes(child_lanes, render_lane) {
+            if !is_subset_of_lanes(child_lanes.clone(), render_lane.clone()) {
                 alternate_unwrapped.borrow_mut().child_lanes =
-                    merge_lanes(child_lanes, render_lane);
+                    merge_lanes(child_lanes.clone(), render_lane.clone());
             }
         }
 

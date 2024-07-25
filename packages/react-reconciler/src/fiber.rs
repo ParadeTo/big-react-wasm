@@ -46,7 +46,7 @@ impl MemoizedState {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FiberDependencies {
     pub first_context: Option<Rc<RefCell<ContextItem>>>,
     pub lanes: Lane,
@@ -217,6 +217,13 @@ impl FiberNode {
                 wip.child_lanes = c.child_lanes.clone();
                 wip.memoized_props = c.memoized_props.clone();
                 wip.memoized_state = c.memoized_state.clone();
+                wip.dependencies = match c.dependencies.clone() {
+                    Some(d) => Some(Rc::new(RefCell::new(FiberDependencies {
+                        lanes: d.borrow().lanes.clone(),
+                        first_context: d.borrow().first_context.clone(),
+                    }))),
+                    None => None,
+                };
                 wip.alternate = Some(current);
                 wip
             };
@@ -244,6 +251,13 @@ impl FiberNode {
                 wip.child_lanes = c.child_lanes.clone();
                 wip.memoized_props = c.memoized_props.clone();
                 wip.memoized_state = c.memoized_state.clone();
+                wip.dependencies = match c.dependencies.clone() {
+                    Some(d) => Some(Rc::new(RefCell::new(FiberDependencies {
+                        lanes: d.borrow().lanes.clone(),
+                        first_context: d.borrow().first_context.clone(),
+                    }))),
+                    None => None,
+                };
                 wip._ref = c._ref.clone();
             }
             w.clone()
