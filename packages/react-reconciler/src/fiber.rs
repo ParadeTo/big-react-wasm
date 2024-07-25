@@ -11,6 +11,7 @@ use web_sys::js_sys::Reflect;
 
 use shared::{derive_from_js_value, log, type_of, REACT_PROVIDER_TYPE};
 
+use crate::fiber_context::ContextItem;
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::{Effect, Hook};
 use crate::fiber_lanes::{get_highest_priority, merge_lanes, Lane};
@@ -45,6 +46,12 @@ impl MemoizedState {
     }
 }
 
+#[derive(Clone)]
+pub struct FiberDependencies {
+    pub first_context: Option<Rc<RefCell<ContextItem>>>,
+    pub lanes: Lane,
+}
+
 pub struct FiberNode {
     pub lanes: Lane,
     pub child_lanes: Lane,
@@ -65,6 +72,7 @@ pub struct FiberNode {
     pub memoized_props: JsValue,
     pub memoized_state: Option<MemoizedState>,
     pub deletions: Vec<Rc<RefCell<FiberNode>>>,
+    pub dependencies: Option<Rc<RefCell<FiberDependencies>>>,
 }
 
 impl Debug for FiberNode {
@@ -146,6 +154,7 @@ impl FiberNode {
             lanes: Lane::NoLane,
             child_lanes: Lane::NoLane,
             _ref,
+            dependencies: None,
         }
     }
 
