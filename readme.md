@@ -1,7 +1,7 @@
 # How to start?
 
 - install wasm-pack
-- `npm run build`
+- `npm run build:dev`
 - cd `examples/hello-world`
 - `pnpm install`
 - `npm run dev`
@@ -43,3 +43,5 @@
 [从零实现 React v18，但 WASM 版 - [17] 实现 Concurrent 模式](https://www.paradeto.com/2024/06/19/big-react-wasm-17/)
 
 [从零实现 React v18，但 WASM 版 - [18] 实现 useRef, useCallback, useMemo](https://www.paradeto.com/2024/07/10/big-react-wasm-18/)
+
+[从零实现 React v18，但 WASM 版 - [19] 性能优化之 bailout 和 eagerState](https://www.paradeto.com/2024/07/19/big-react-wasm-19/)
