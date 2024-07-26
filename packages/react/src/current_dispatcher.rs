@@ -2,8 +2,6 @@ use js_sys::{Function, Reflect};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::use_callback;
-
 #[derive(Debug)]
 pub struct Dispatcher {
     pub use_state: Function,
@@ -11,6 +9,7 @@ pub struct Dispatcher {
     pub use_ref: Function,
     pub use_memo: Function,
     pub use_callback: Function,
+    pub use_context: Function,
 }
 
 unsafe impl Send for Dispatcher {}
@@ -22,6 +21,7 @@ impl Dispatcher {
         use_ref: Function,
         use_memo: Function,
         use_callback: Function,
+        use_context: Function,
     ) -> Self {
         Dispatcher {
             use_state,
@@ -29,6 +29,7 @@ impl Dispatcher {
             use_ref,
             use_memo,
             use_callback,
+            use_context,
         }
     }
 }
@@ -53,11 +54,13 @@ pub unsafe fn update_dispatcher(args: &JsValue) {
     let use_ref = derive_function_from_js_value(args, "use_ref");
     let use_memo = derive_function_from_js_value(args, "use_memo");
     let use_callback = derive_function_from_js_value(args, "use_callback");
+    let use_context = derive_function_from_js_value(args, "use_context");
     CURRENT_DISPATCHER.current = Some(Box::new(Dispatcher::new(
         use_state,
         use_effect,
         use_ref,
         use_memo,
         use_callback,
+        use_context,
     )))
 }

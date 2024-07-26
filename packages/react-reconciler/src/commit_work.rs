@@ -12,7 +12,9 @@ use crate::fiber::{FiberNode, FiberRootNode, StateNode};
 use crate::fiber_flags::{get_mutation_mask, get_passive_mask, Flags};
 use crate::fiber_hooks::Effect;
 use crate::work_tags::WorkTag;
-use crate::work_tags::WorkTag::{HostComponent, HostRoot, HostText};
+use crate::work_tags::WorkTag::{
+    ContextProvider, FunctionComponent, HostComponent, HostRoot, HostText,
+};
 use crate::HOST_CONFIG;
 
 static mut NEXT_EFFECT: Option<Rc<RefCell<FiberNode>>> = None;
@@ -309,20 +311,24 @@ fn commit_deletion(child_to_delete: Rc<RefCell<FiberNode>>, root: Rc<RefCell<Fib
     commit_nested_unmounts(child_to_delete.clone(), |unmount_fiber| {
         let cloned = first_host_fiber.clone();
         match unmount_fiber.borrow().tag {
-            WorkTag::FunctionComponent => {
+            FunctionComponent => {
                 commit_passive_effect(unmount_fiber.clone(), root.clone(), "unmount");
             }
-            WorkTag::HostRoot => {}
-            WorkTag::HostComponent => {
+            HostRoot => {}
+            HostComponent => {
                 if cloned.borrow().is_none() {
                     *cloned.borrow_mut() = Some(unmount_fiber.clone());
                 }
             }
-            WorkTag::HostText => {
+            HostText => {
                 if cloned.borrow().is_none() {
                     *cloned.borrow_mut() = Some(unmount_fiber.clone());
                 }
             }
+            HostRoot => todo!(),
+            HostComponent => todo!(),
+            HostText => todo!(),
+            ContextProvider => todo!(),
         };
     });
 

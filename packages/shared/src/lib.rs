@@ -1,8 +1,10 @@
-use web_sys::js_sys::JSON::stringify;
 use web_sys::js_sys::Reflect;
+use web_sys::js_sys::JSON::stringify;
 use web_sys::wasm_bindgen::JsValue;
 
 pub static REACT_ELEMENT_TYPE: &str = "react.element";
+pub static REACT_CONTEXT_TYPE: &str = "react.context";
+pub static REACT_PROVIDER_TYPE: &str = "react.provider";
 
 #[macro_export]
 macro_rules! log {

@@ -17,6 +17,7 @@ mod child_fiber;
 mod commit_work;
 mod complete_work;
 pub mod fiber;
+mod fiber_context;
 mod fiber_flags;
 mod fiber_hooks;
 pub mod fiber_lanes;

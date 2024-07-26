@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Array, Function, Object, Reflect};
 
-use shared::{is_dev, log};
+use shared::{derive_from_js_value, is_dev, log};
 
 use crate::begin_work::mark_wip_received_update;
 use crate::fiber::{FiberNode, MemoizedState};
@@ -146,12 +146,23 @@ fn update_hooks_to_dispatcher(is_update: bool) {
         .clone();
     use_callback_clusure.forget();
 
+    // use_context
+    let use_context_clusure =
+        Closure::wrap(Box::new(read_context) as Box<dyn Fn(JsValue) -> JsValue>);
+    let use_context = use_context_clusure
+        .as_ref()
+        .unchecked_ref::<Function>()
+        .clone();
+    use_context_clusure.forget();
+
     Reflect::set(&object, &"use_state".into(), &use_state).expect("TODO: panic set use_state");
     Reflect::set(&object, &"use_effect".into(), &use_effect).expect("TODO: panic set use_effect");
     Reflect::set(&object, &"use_ref".into(), &use_ref).expect("TODO: panic set use_ref");
     Reflect::set(&object, &"use_memo".into(), &use_memo).expect("TODO: panic set use_memo");
     Reflect::set(&object, &"use_callback".into(), &use_callback)
         .expect("TODO: panic set use_callback");
+    Reflect::set(&object, &"use_context".into(), &use_context)
+        .expect("TODO: panic set use_context");
 
     updateDispatcher(&object.into());
 }
@@ -666,14 +677,15 @@ fn update_memo(create: Function, deps: JsValue) -> Result<JsValue, JsValue> {
         deps
     };
 
-    if let MemoizedState::MemoizedJsValue(prev_state) = hook
-        .clone()
-        .unwrap()
-        .borrow()
-        .memoized_state
-        .as_ref()
-        .unwrap()
-    {
+    let memoized_state = {
+        hook.clone()
+            .unwrap()
+            .borrow()
+            .memoized_state
+            .clone()
+            .unwrap()
+    };
+    if let MemoizedState::MemoizedJsValue(prev_state) = memoized_state {
         if !next_deps.is_null() {
             let arr = prev_state.dyn_ref::<Array>().unwrap();
             let prev_deps = arr.get(1);
@@ -738,4 +750,13 @@ fn update_callback(callback: Function, deps: JsValue) -> JsValue {
         return callback.into();
     }
     panic!("update_callback, memoized_state is not JsValue");
+}
+
+fn read_context(context: JsValue) -> JsValue {
+    let consumer = unsafe { CURRENTLY_RENDERING_FIBER.clone() };
+    if consumer.is_none() {
+        panic!("Can only call useContext in Function Component");
+    }
+    let value = derive_from_js_value(&context, "_currentValue");
+    value
 }
