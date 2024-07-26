@@ -9,6 +9,7 @@ use shared::{derive_from_js_value, is_dev, log};
 
 use crate::begin_work::mark_wip_received_update;
 use crate::fiber::{FiberNode, MemoizedState};
+use crate::fiber_context::read_context as read_context_origin;
 use crate::fiber_flags::Flags;
 use crate::fiber_lanes::{merge_lanes, remove_lanes, request_update_lane, Lane};
 use crate::update_queue::{
@@ -169,6 +170,7 @@ fn update_hooks_to_dispatcher(is_update: bool) {
 
 pub fn render_with_hooks(
     work_in_progress: Rc<RefCell<FiberNode>>,
+    Component: JsValue,
     lane: Lane,
 ) -> Result<JsValue, JsValue> {
     unsafe {
@@ -189,15 +191,13 @@ pub fn render_with_hooks(
         update_hooks_to_dispatcher(false);
     }
 
-    let _type;
     let props;
     {
         let work_in_progress_borrow = work_in_progress_cloned.borrow();
-        _type = work_in_progress_borrow._type.clone();
         props = work_in_progress_borrow.pending_props.clone();
     }
 
-    let component = JsValue::dyn_ref::<Function>(&_type).unwrap();
+    let component = JsValue::dyn_ref::<Function>(&Component).unwrap();
     let children = component.call1(&JsValue::null(), &props);
 
     unsafe {
@@ -754,9 +754,5 @@ fn update_callback(callback: Function, deps: JsValue) -> JsValue {
 
 fn read_context(context: JsValue) -> JsValue {
     let consumer = unsafe { CURRENTLY_RENDERING_FIBER.clone() };
-    if consumer.is_none() {
-        panic!("Can only call useContext in Function Component");
-    }
-    let value = derive_from_js_value(&context, "_currentValue");
-    value
+    read_context_origin(consumer, context)
 }
