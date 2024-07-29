@@ -8,7 +8,7 @@ use web_sys::js_sys::Object;
 
 use crate::child_fiber::{clone_child_fiblers, mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
-use crate::fiber_context::push_provider;
+use crate::fiber_context::{prepare_to_read_context, propagate_context_change, push_provider};
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::{bailout_hook, render_with_hooks};
 use crate::fiber_lanes::{include_some_lanes, Lane};
@@ -25,13 +25,6 @@ fn bailout_on_already_finished_work(
     wip: Rc<RefCell<FiberNode>>,
     render_lane: Lane,
 ) -> Option<Rc<RefCell<FiberNode>>> {
-    // log!(
-    //     "tag:{:?} child_lanes:{:?} render_lanes:{:?} result:{:?}",
-    //     wip.borrow().tag,
-    //     wip.borrow().child_lanes.clone(),
-    //     render_lane,
-    //     wip.borrow().child_lanes.clone() & render_lane.clone()
-    // );
     if !include_some_lanes(wip.borrow().child_lanes.clone(), render_lane) {
         if is_dev() {
             log!("bailout the whole subtree {:?}", wip);
@@ -57,6 +50,7 @@ pub fn begin_work(
     work_in_progress: Rc<RefCell<FiberNode>>,
     render_lane: Lane,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
+    log!("begin_work {:?}", work_in_progress);
     unsafe {
         DID_RECEIVE_UPDATE = false;
     };
@@ -87,6 +81,18 @@ pub fn begin_work(
                 //     render_lane
                 // );
                 // // }
+                match work_in_progress.borrow().tag {
+                    WorkTag::ContextProvider => {
+                        let new_value = derive_from_js_value(
+                            &work_in_progress.borrow().memoized_props,
+                            "value",
+                        );
+                        let context =
+                            derive_from_js_value(&work_in_progress.borrow()._type, "_context");
+                        push_provider(&context, new_value);
+                    }
+                    _ => {}
+                }
                 return Ok(bailout_on_already_finished_work(
                     work_in_progress,
                     render_lane,
@@ -101,25 +107,48 @@ pub fn begin_work(
     //     current.borrow_mut().lanes = Lane::NoLane;
     // }
 
-    let tag = work_in_progress.clone().borrow().tag.clone();
+    let tag = { work_in_progress.clone().borrow().tag.clone() };
     return match tag {
         WorkTag::FunctionComponent => {
-            update_function_component(work_in_progress.clone(), render_lane)
+            let Component = { work_in_progress.borrow()._type.clone() };
+            update_function_component(work_in_progress.clone(), Component, render_lane)
         }
         WorkTag::HostRoot => Ok(update_host_root(work_in_progress.clone(), render_lane)),
         WorkTag::HostComponent => Ok(update_host_component(work_in_progress.clone())),
         WorkTag::HostText => Ok(None),
-        WorkTag::ContextProvider => Ok(update_context_provider(work_in_progress.clone())),
+        WorkTag::ContextProvider => Ok(update_context_provider(
+            work_in_progress.clone(),
+            render_lane,
+        )),
     };
 }
 
 fn update_context_provider(
     work_in_progress: Rc<RefCell<FiberNode>>,
+    render_lane: Lane,
 ) -> Option<Rc<RefCell<FiberNode>>> {
     let provider_type = { work_in_progress.borrow()._type.clone() };
     let context = derive_from_js_value(&provider_type, "_context");
     let new_props = { work_in_progress.borrow().pending_props.clone() };
+    let old_props = { work_in_progress.borrow().memoized_props.clone() };
+    let new_value = derive_from_js_value(&new_props, "value");
+
     push_provider(&context, derive_from_js_value(&new_props, "value"));
+
+    if !old_props.is_null() {
+        let old_value = derive_from_js_value(&old_props, "value");
+        if Object::is(&old_value, &new_value)
+            && Object::is(
+                &derive_from_js_value(&old_props, "children"),
+                &derive_from_js_value(&new_props, "children"),
+            )
+        {
+            return bailout_on_already_finished_work(work_in_progress.clone(), render_lane);
+        } else {
+            propagate_context_change(work_in_progress.clone(), context, render_lane);
+        }
+    }
+
     let next_children = derive_from_js_value(&new_props, "children");
     reconcile_children(work_in_progress.clone(), Some(next_children));
     work_in_progress.clone().borrow().child.clone()
@@ -127,11 +156,17 @@ fn update_context_provider(
 
 fn update_function_component(
     work_in_progress: Rc<RefCell<FiberNode>>,
+    Component: JsValue,
     render_lane: Lane,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
-    let next_children = render_with_hooks(work_in_progress.clone(), render_lane.clone())?;
+    prepare_to_read_context(work_in_progress.clone(), render_lane.clone());
+    let next_children =
+        render_with_hooks(work_in_progress.clone(), Component, render_lane.clone())?;
 
     let current = work_in_progress.borrow().alternate.clone();
+    log!("{:?} {:?}", work_in_progress.clone(), unsafe {
+        DID_RECEIVE_UPDATE
+    });
     if current.is_some() && unsafe { !DID_RECEIVE_UPDATE } {
         bailout_hook(work_in_progress.clone(), render_lane.clone());
         return Ok(bailout_on_already_finished_work(
@@ -165,15 +200,45 @@ fn update_host_root(
             .clone();
     }
 
+    let prev_children = { work_in_progress_cloned.borrow().memoized_state.clone() };
+
     {
+        work_in_progress
+            .clone()
+            .borrow_mut()
+            .update_queue
+            .clone()
+            .unwrap()
+            .borrow_mut()
+            .shared
+            .pending = None;
         let ReturnOfProcessUpdateQueue { memoized_state, .. } =
-            process_update_queue(base_state, pending, render_lane, None);
-        work_in_progress.clone().borrow_mut().memoized_state = memoized_state;
+            process_update_queue(base_state, pending, render_lane.clone(), None);
+        work_in_progress.clone().borrow_mut().memoized_state = memoized_state.clone();
+        let current = { work_in_progress.borrow().alternate.clone() };
+        if current.is_some() {
+            let current = current.unwrap();
+            if current.borrow().memoized_state.is_none() {
+                current.borrow_mut().memoized_state = memoized_state;
+            }
+        }
     }
 
     let next_children = work_in_progress_cloned.borrow().memoized_state.clone();
     if next_children.is_none() {
         panic!("update_host_root next_children is none")
+    }
+
+    // let prev_children = prev_children.unwrap();
+    if let Some(MemoizedState::MemoizedJsValue(prev_children)) = prev_children {
+        if let Some(MemoizedState::MemoizedJsValue(next_children)) = next_children.clone() {
+            if Object::is(&prev_children, &next_children) {
+                return bailout_on_already_finished_work(
+                    work_in_progress.clone(),
+                    render_lane.clone(),
+                );
+            }
+        }
     }
 
     if let MemoizedState::MemoizedJsValue(next_children) = next_children.unwrap() {
