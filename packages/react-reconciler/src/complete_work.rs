@@ -5,7 +5,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::{Object, Reflect};
 
-use shared::{derive_from_js_value, log};
+use shared::derive_from_js_value;
 
 use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_context::pop_provider;
@@ -141,16 +141,6 @@ impl CompleteWork {
         let current = { work_in_progress_cloned.borrow().alternate.clone() };
         let tag = { work_in_progress_cloned.borrow().tag.clone() };
         match tag {
-            WorkTag::FunctionComponent => {
-                self.bubble_properties(work_in_progress.clone());
-                // log!("bubble_properties function {:?}", work_in_progress.clone());
-                None
-            }
-            WorkTag::HostRoot => {
-                self.bubble_properties(work_in_progress.clone());
-                // log!("bubble_properties HostRoot {:?}", work_in_progress.clone());
-                None
-            }
             WorkTag::HostComponent => {
                 if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
                     // todo compare
@@ -219,6 +209,10 @@ impl CompleteWork {
                 let _type = { work_in_progress.borrow()._type.clone() };
                 let context = derive_from_js_value(&_type, "_context");
                 pop_provider(&context);
+                self.bubble_properties(work_in_progress.clone());
+                None
+            }
+            _ => {
                 self.bubble_properties(work_in_progress.clone());
                 None
             }

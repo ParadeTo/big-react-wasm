@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 
-use shared::{derive_from_js_value, is_dev, log};
-use web_sys::js_sys::Object;
+use shared::{derive_from_js_value, is_dev, log, shallow_equal};
+use web_sys::js_sys::{Function, Object};
 
 use crate::child_fiber::{clone_child_fiblers, mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
@@ -118,9 +118,49 @@ pub fn begin_work(
         WorkTag::HostText => Ok(None),
         WorkTag::ContextProvider => Ok(update_context_provider(
             work_in_progress.clone(),
-            render_lane,
+            render_lane.clone(),
         )),
+        WorkTag::MemoComponent => update_memo_component(work_in_progress.clone(), render_lane),
     };
+}
+
+fn update_memo_component(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    render_lane: Lane,
+) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
+    let current = { work_in_progress.borrow().alternate.clone() };
+    let next_props = { work_in_progress.borrow().pending_props.clone() };
+
+    if current.is_some() {
+        let current = current.unwrap();
+        let prev_props = current.borrow().memoized_props.clone();
+        if !check_scheduled_update_or_context(current.clone(), render_lane.clone()) {
+            let mut props_equal = false;
+            let compare = derive_from_js_value(&work_in_progress.borrow()._type, "compare");
+            if compare.is_function() {
+                let f = compare.dyn_ref::<Function>().unwrap();
+                props_equal = f
+                    .call2(&JsValue::null(), &prev_props, &next_props)
+                    .unwrap()
+                    .as_bool()
+                    .unwrap();
+            } else {
+                props_equal = shallow_equal(&prev_props, &next_props);
+            }
+
+            if props_equal && Object::is(&current.borrow()._ref, &work_in_progress.borrow()._ref) {
+                unsafe { DID_RECEIVE_UPDATE = false };
+                work_in_progress.borrow_mut().pending_props = prev_props;
+                work_in_progress.borrow_mut().lanes = current.borrow().lanes.clone();
+                return Ok(bailout_on_already_finished_work(
+                    work_in_progress.clone(),
+                    render_lane,
+                ));
+            }
+        }
+    }
+    let Component = { derive_from_js_value(&work_in_progress.borrow()._type, "type") };
+    update_function_component(work_in_progress.clone(), Component, render_lane)
 }
 
 fn update_context_provider(

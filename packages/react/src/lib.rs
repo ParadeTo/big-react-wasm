@@ -1,7 +1,10 @@
 use js_sys::{Array, Object, Reflect, JSON};
 use wasm_bindgen::prelude::*;
 
-use shared::{derive_from_js_value, REACT_CONTEXT_TYPE, REACT_ELEMENT_TYPE, REACT_PROVIDER_TYPE};
+use shared::{
+    derive_from_js_value, REACT_CONTEXT_TYPE, REACT_ELEMENT_TYPE, REACT_MEMO_TYPE,
+    REACT_PROVIDER_TYPE,
+};
 
 use crate::current_dispatcher::CURRENT_DISPATCHER;
 
@@ -165,4 +168,28 @@ pub unsafe fn create_context(default_value: &JsValue) -> JsValue {
     Reflect::set(&provider, &"_context".into(), &context);
     Reflect::set(&context, &"Provider".into(), &provider);
     context.into()
+}
+
+#[wasm_bindgen]
+pub unsafe fn memo(_type: &JsValue, compare: &JsValue) -> JsValue {
+    let fiber_type = Object::new();
+
+    Reflect::set(
+        &fiber_type,
+        &"$$typeof".into(),
+        &JsValue::from_str(REACT_MEMO_TYPE),
+    );
+    Reflect::set(&fiber_type, &"type".into(), _type);
+
+    let null = JsValue::null();
+    Reflect::set(
+        &fiber_type,
+        &"compare".into(),
+        if compare.is_undefined() {
+            &null
+        } else {
+            compare
+        },
+    );
+    fiber_type.into()
 }
