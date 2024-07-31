@@ -45,3 +45,7 @@
 [从零实现 React v18，但 WASM 版 - [18] 实现 useRef, useCallback, useMemo](https://www.paradeto.com/2024/07/10/big-react-wasm-18/)
 
 [从零实现 React v18，但 WASM 版 - [19] 性能优化之 bailout 和 eagerState](https://www.paradeto.com/2024/07/19/big-react-wasm-19/)
+
+[从零实现 React v18，但 WASM 版 - [20] 实现 Context](https://www.paradeto.com/2024/07/26/big-react-wasm-20/)
+
+[从零实现 React v18，但 WASM 版 - [21] 性能优化支持 Context](https://www.paradeto.com/2024/07/26/big-react-wasm-21/)
