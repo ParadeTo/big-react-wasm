@@ -1,1 +1,1 @@
-export {default} from './useContext/index2'
+export {default} from './memo'

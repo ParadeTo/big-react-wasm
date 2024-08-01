@@ -1,10 +1,11 @@
-use web_sys::js_sys::Reflect;
 use web_sys::js_sys::JSON::stringify;
-use web_sys::wasm_bindgen::JsValue;
+use web_sys::js_sys::{Object, Reflect};
+use web_sys::wasm_bindgen::{JsCast, JsValue};
 
 pub static REACT_ELEMENT_TYPE: &str = "react.element";
 pub static REACT_CONTEXT_TYPE: &str = "react.context";
 pub static REACT_PROVIDER_TYPE: &str = "react.provider";
+pub static REACT_MEMO_TYPE: &str = "react.memo";
 
 #[macro_export]
 macro_rules! log {
@@ -66,4 +67,36 @@ pub fn to_string(js_value: &JsValue) -> String {
             js_string.into()
         }
     })
+}
+
+pub fn shallow_equal(a: &JsValue, b: &JsValue) -> bool {
+    if Object::is(a, b) {
+        return true;
+    }
+
+    if !type_of(a, "object") || a.is_null() || !type_of(b, "object") || b.is_null() {
+        return false;
+    }
+
+    let a = a.dyn_ref::<Object>().unwrap();
+    let b = b.dyn_ref::<Object>().unwrap();
+    let keys_a = Object::keys(a);
+    let keys_b = Object::keys(b);
+
+    if keys_a.length() != keys_b.length() {
+        return false;
+    }
+
+    for key in keys_a {
+        if !Object::has_own_property(&b, &key)
+            || !Object::is(
+                &Reflect::get(&a, &key).unwrap(),
+                &Reflect::get(&b, &key).unwrap(),
+            )
+        {
+            return false;
+        }
+    }
+
+    true
 }
