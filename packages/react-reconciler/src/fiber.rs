@@ -9,7 +9,9 @@ use scheduler::Task;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::{derive_from_js_value, log, type_of, REACT_MEMO_TYPE, REACT_PROVIDER_TYPE};
+use shared::{
+    derive_from_js_value, log, type_of, REACT_MEMO_TYPE, REACT_PROVIDER_TYPE, REACT_SUSPENSE_TYPE,
+};
 
 use crate::fiber_context::ContextItem;
 use crate::fiber_flags::Flags;
@@ -176,7 +178,10 @@ impl FiberNode {
         let _ref = derive_from_js_value(ele, "ref");
 
         let mut fiber_tag = WorkTag::FunctionComponent;
-        if _type.is_string() {
+
+        if _type == REACT_SUSPENSE_TYPE {
+            fiber_tag = WorkTag::SuspenseComponent
+        } else if _type.is_string() {
             fiber_tag = WorkTag::HostComponent
         } else if type_of(&_type, "object") {
             let _typeof = derive_from_js_value(&_type, "$$typeof");

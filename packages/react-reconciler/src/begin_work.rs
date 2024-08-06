@@ -12,6 +12,7 @@ use crate::fiber_context::{prepare_to_read_context, propagate_context_change, pu
 use crate::fiber_flags::Flags;
 use crate::fiber_hooks::{bailout_hook, render_with_hooks};
 use crate::fiber_lanes::{include_some_lanes, Lane};
+use crate::suspense_context::push_suspense_handler;
 use crate::update_queue::{process_update_queue, ReturnOfProcessUpdateQueue};
 use crate::work_tags::WorkTag;
 
@@ -121,7 +122,44 @@ pub fn begin_work(
             render_lane.clone(),
         )),
         WorkTag::MemoComponent => update_memo_component(work_in_progress.clone(), render_lane),
+        WorkTag::SuspenseComponent => todo!(),
     };
+}
+
+fn mount_suspense_fallback_children(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    primary_children: JsValue,
+    fallback_children: JsValue,
+) {
+    // let primary_child_props
+}
+
+fn update_suspense_component(work_in_progress: Rc<RefCell<FiberNode>>) {
+    let current = { work_in_progress.borrow().alternate.clone() };
+    let next_props = { work_in_progress.borrow().pending_props.clone() };
+
+    let mut show_fallback = false;
+    let did_suspend =
+        (work_in_progress.borrow().flags.clone() & Flags::DidCapture) != Flags::NoFlags;
+
+    if did_suspend {
+        show_fallback = true;
+        work_in_progress.borrow_mut().flags -= Flags::DidCapture;
+    }
+
+    let next_primary_children = derive_from_js_value(&next_props, "children");
+    let next_fallback_children = derive_from_js_value(&next_props, "fallback");
+    push_suspense_handler(work_in_progress.clone());
+
+    if current.is_none() {
+        if show_fallback {
+            return mount_suspense_fallback_children(
+                work_in_progress.clone(),
+                next_primary_children.clone(),
+                next_fallback_children.clone(),
+            );
+        }
+    }
 }
 
 fn update_memo_component(

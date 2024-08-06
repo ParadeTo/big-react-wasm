@@ -70,3 +70,17 @@ fs.writeFileSync(
     ? 'const {updateDispatcher} = require("react");\n'
     : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
 )
+
+// add Suspense
+const reactIndexFilename = `${cwd}/dist/react/index.js`
+const reactIndexData = fs.readFileSync(reactIndexFilename)
+fs.writeFileSync(
+  reactIndexFilename,
+  reactIndexData + `export const Suspense='react.suspense';\n`
+)
+const reactTsIndexFilename = `${cwd}/dist/react/index.d.ts`
+const reactTsIndexData = fs.readFileSync(reactTsIndexFilename)
+fs.writeFileSync(
+  reactTsIndexFilename,
+  reactTsIndexData + `export const Suspense: string;\n`
+)

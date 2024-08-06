@@ -22,6 +22,7 @@ mod fiber_flags;
 mod fiber_hooks;
 pub mod fiber_lanes;
 mod hook_effect_tags;
+mod suspense_context;
 mod sync_task_queue;
 mod update_queue;
 mod work_loop;

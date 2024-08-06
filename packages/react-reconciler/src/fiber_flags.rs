@@ -9,6 +9,7 @@ bitflags! {
         const ChildDeletion = 0b00010000;
         const PassiveEffect = 0b00100000;
         const Ref = 0b01000000;
+        const DidCapture = 0b1000000;
         const LayoutMask = 0b01000000; // Ref
         // effect hook
         const HookHasEffect = 0b00100001;
