@@ -117,18 +117,7 @@ impl Debug for FiberNode {
                 )
                 .expect("print error");
             }
-            WorkTag::ContextProvider => {
-                write!(
-                    f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
-                    self._type.as_ref(),
-                    self.flags,
-                    self.subtree_flags,
-                    self.lanes
-                )
-                .expect("print error");
-            }
-            WorkTag::MemoComponent => {
+            _ => {
                 write!(
                     f,
                     "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
@@ -167,6 +156,10 @@ impl FiberNode {
             _ref,
             dependencies: None,
         }
+    }
+
+    pub fn create_fiber_from_fragment(elements: JsValue, key: JsValue) -> FiberNode {
+        FiberNode::new(WorkTag::Fragment, elements, key, JsValue::null())
     }
 
     pub fn create_fiber_from_element(ele: &JsValue) -> Self {

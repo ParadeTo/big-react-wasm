@@ -6,7 +6,7 @@ use std::rc::Rc;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Array, Object, Reflect};
 
-use shared::{derive_from_js_value, log, type_of, REACT_ELEMENT_TYPE};
+use shared::{derive_from_js_value, log, type_of, REACT_ELEMENT_TYPE, REACT_FRAGMENT_TYPE};
 
 use crate::fiber::FiberNode;
 use crate::fiber_flags::Flags;
@@ -205,6 +205,26 @@ impl Hash for Key {
     }
 }
 
+fn update_fragment(
+    return_fiber: Rc<RefCell<FiberNode>>,
+    current: Option<Rc<RefCell<FiberNode>>>,
+    elements: JsValue,
+    key: Key,
+    existing_children: &mut HashMap<Key, Rc<RefCell<FiberNode>>>,
+) -> Rc<RefCell<FiberNode>> {
+    let fiber;
+    if current.is_none() || current.clone().unwrap().borrow().tag != WorkTag::Fragment {
+        fiber = Rc::new(RefCell::new(FiberNode::create_fiber_from_fragment(
+            elements, key.0,
+        )));
+    } else {
+        existing_children.remove(&key);
+        fiber = use_fiber(current.clone().unwrap(), elements);
+    }
+    fiber.borrow_mut()._return = Some(return_fiber);
+    fiber
+}
+
 fn update_from_map(
     return_fiber: Rc<RefCell<FiberNode>>,
     existing_children: &mut HashMap<Key, Rc<RefCell<FiberNode>>>,
@@ -250,31 +270,58 @@ fn update_from_map(
                 JsValue::null(),
             ))))
         };
+    } else if element.is_array() {
+        let before = match before {
+            Some(before) => Some((*before).clone()),
+            None => None,
+        };
+        return Some(update_fragment(
+            return_fiber,
+            before,
+            (*element).clone(),
+            Key(key_to_use.clone()),
+            existing_children,
+        ));
     } else if type_of(element, "object") && !element.is_null() {
-        if derive_from_js_value(&(*element).clone(), "$$typeof") != REACT_ELEMENT_TYPE {
-            panic!("Undefined $$typeof");
-        }
-
-        if before.is_some() {
-            let before = (*before.clone().unwrap()).clone();
-            existing_children.remove(&Key(key_to_use.clone()));
-            if Object::is(
-                &before.borrow()._type,
-                &derive_from_js_value(&(*element).clone(), "type"),
-            ) {
-                return Some(use_fiber(
-                    before.clone(),
-                    derive_from_js_value(element, "props"),
+        if derive_from_js_value(&(*element).clone(), "$$typeof") == REACT_ELEMENT_TYPE {
+            if derive_from_js_value(&(*element).clone(), "type") == REACT_FRAGMENT_TYPE {
+                let before = match before {
+                    Some(before) => Some((*before).clone()),
+                    None => None,
+                };
+                return Some(update_fragment(
+                    return_fiber,
+                    before,
+                    (*element).clone(),
+                    Key(key_to_use.clone()),
+                    existing_children,
                 ));
-            } else {
-                delete_child(return_fiber, before, should_track_effects);
             }
-        }
 
-        return Some(Rc::new(RefCell::new(FiberNode::create_fiber_from_element(
-            element,
-        ))));
+            if before.is_some() {
+                let before = (*before.clone().unwrap()).clone();
+                existing_children.remove(&Key(key_to_use.clone()));
+                if Object::is(
+                    &before.borrow()._type,
+                    &derive_from_js_value(&(*element).clone(), "type"),
+                ) {
+                    return Some(use_fiber(
+                        before.clone(),
+                        derive_from_js_value(element, "props"),
+                    ));
+                }
+
+                // else {
+                //     delete_child(return_fiber, before, should_track_effects);
+                // }
+            }
+
+            return Some(Rc::new(RefCell::new(FiberNode::create_fiber_from_element(
+                element,
+            ))));
+        }
     }
+
     None
 }
 
