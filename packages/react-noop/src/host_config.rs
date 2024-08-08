@@ -2,12 +2,14 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use react_reconciler::work_tags::WorkTag;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys;
 use web_sys::js_sys::JSON::stringify;
 use web_sys::js_sys::{global, Array, Function, Object, Promise, Reflect};
 
+use react_reconciler::fiber::FiberNode;
 use react_reconciler::HostConfig;
 use shared::{derive_from_js_value, log};
 
@@ -67,6 +69,13 @@ pub fn create_container() -> JsValue {
     Reflect::set(&container, &"pendingChildren".into(), &**Array::new());
     Reflect::set(&container, &"children".into(), &**Array::new());
     container.into()
+}
+
+impl ReactNoopHostConfig {
+    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue) {
+        let text_instance = text_instance.clone().downcast::<JsValue>().unwrap();
+        Reflect::set(&text_instance, &"text".into(), content);
+    }
 }
 
 impl HostConfig for ReactNoopHostConfig {
@@ -136,11 +145,6 @@ impl HostConfig for ReactNoopHostConfig {
         children.splice(index as u32, 1, &JsValue::undefined());
     }
 
-    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue) {
-        let text_instance = text_instance.clone().downcast::<JsValue>().unwrap();
-        Reflect::set(&text_instance, &"text".into(), content);
-    }
-
     fn insert_child_to_container(
         &self,
         child: Rc<dyn Any>,
@@ -207,6 +211,19 @@ impl HostConfig for ReactNoopHostConfig {
                 0,
             );
             closure_clone.borrow_mut().take().unwrap_throw().forget();
+        }
+    }
+
+    fn commit_update(&self, fiber: Rc<RefCell<FiberNode>>) {
+        match fiber.borrow().tag {
+            WorkTag::HostText => {
+                let text = derive_from_js_value(&fiber.borrow().memoized_props, "content");
+                let instance = FiberNode::derive_state_node(fiber.clone());
+                self.commit_text_update(instance.unwrap(), &text);
+            }
+            _ => {
+                log!("Unsupported update type")
+            }
         }
     }
 }
