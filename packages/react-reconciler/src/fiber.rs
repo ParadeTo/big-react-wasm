@@ -78,17 +78,6 @@ pub struct FiberNode {
 impl Debug for FiberNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Ok(match self.tag {
-            WorkTag::FunctionComponent => {
-                write!(
-                    f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
-                    self._type.as_ref(),
-                    self.flags,
-                    self.subtree_flags,
-                    self.lanes
-                )
-                .expect("print error");
-            }
             WorkTag::HostRoot => {
                 write!(
                     f,
@@ -120,11 +109,12 @@ impl Debug for FiberNode {
             _ => {
                 write!(
                     f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
+                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?}, childLanes:{:?})",
                     self._type.as_ref(),
                     self.flags,
                     self.subtree_flags,
-                    self.lanes
+                    self.lanes,
+                    self.child_lanes
                 )
                 .expect("print error");
             }
@@ -269,6 +259,7 @@ impl FiberNode {
                 };
                 wip._ref = c._ref.clone();
             }
+            log!("create wip wip:{:?} current:{:?}", w, c_rc);
             w.clone()
         };
     }

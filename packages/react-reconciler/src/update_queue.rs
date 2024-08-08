@@ -117,6 +117,11 @@ pub fn process_update_queue(
             let mut update = pending.clone().unwrap();
             let update_lane = update.borrow().lane.clone();
             if !is_subset_of_lanes(render_lanes.clone(), update_lane.clone()) {
+                log!(
+                    "underpriority render_lanes:{:?} update_lane:{:?}",
+                    render_lanes.clone(),
+                    update_lane.clone()
+                );
                 // underpriority
                 let clone = Rc::new(RefCell::new(create_update(
                     update.borrow().action.clone().unwrap(),
@@ -230,7 +235,8 @@ pub fn process_update_queue(
         }
 
         if new_base_queue_last.is_none() {
-            new_base_state = result.memoized_state.clone();
+            new_base_state = new_state.clone();
+            log!("process_update_queue new_base_state:{:?}", new_base_state)
         } else {
             new_base_queue_last.clone().unwrap().borrow_mut().next = new_base_queue_last.clone();
         }
