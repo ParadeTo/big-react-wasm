@@ -87,14 +87,6 @@ impl Debug for FiberNode {
                 )
                 .expect("print error");
             }
-            WorkTag::HostComponent => {
-                write!(
-                    f,
-                    "{:?}(key:{:?},flags:{:?},subtreeFlags:{:?})",
-                    self._type, self.key, self.flags, self.subtree_flags
-                )
-                .expect("print error");
-            }
             WorkTag::HostText => {
                 write!(
                     f,
@@ -109,8 +101,10 @@ impl Debug for FiberNode {
             _ => {
                 write!(
                     f,
-                    "{:?}(flags:{:?},subtreeFlags:{:?},lanes:{:?},childLanes:{:?})",
+                    "{:?}(tag:{:?},key:{:?}flags:{:?},subtreeFlags:{:?},lanes:{:?},childLanes:{:?})",
                     self._type.as_ref(),
+                    self.tag,
+                    self.key,
                     self.flags,
                     self.subtree_flags,
                     self.lanes,

@@ -133,7 +133,15 @@ fn reconcile_single_element(
         }
     }
 
-    let mut fiber = FiberNode::create_fiber_from_element(element);
+    let mut fiber ;
+    if derive_from_js_value(&element, "type") == REACT_FRAGMENT_TYPE {
+        let props = derive_from_js_value(&element, "props");
+        let children = derive_from_js_value(&props, "children");
+        fiber = FiberNode::create_fiber_from_fragment(children, key);
+    } else {
+        fiber = FiberNode::create_fiber_from_element(element);
+    }
+   
     fiber._return = Some(return_fiber.clone());
     Rc::new(RefCell::new(fiber))
 }
