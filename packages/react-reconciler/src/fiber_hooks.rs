@@ -350,7 +350,6 @@ fn mount_state(initial_state: &JsValue) -> Result<Vec<JsValue>, JsValue> {
     let q_rc_cloned = q_rc.clone();
     let fiber = unsafe { CURRENTLY_RENDERING_FIBER.clone().unwrap() };
     let closure = Closure::wrap(Box::new(move |action: &JsValue| {
-        log!("action {:?}", action);
         dispatch_set_state(fiber.clone(), (*q_rc_cloned).clone(), action)
     }) as Box<dyn Fn(&JsValue)>);
     let function: Function = closure.as_ref().unchecked_ref::<Function>().clone();
@@ -419,13 +418,6 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
             }),
         );
 
-        log!(
-            "memoized_state:{:?} pre_state:{:?} base_state:{:?} new_base_state:{:?}",
-            memoized_state,
-            pre_state,
-            base_state,
-            new_base_state
-        );
         if !(memoized_state.is_none() && pre_state.is_none()) {
             let memoized_state = memoized_state.clone().unwrap();
             let pre_state = pre_state.unwrap();

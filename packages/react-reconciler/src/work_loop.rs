@@ -72,7 +72,6 @@ pub fn mark_update_lane_from_fiber_to_root(
         let p = parent.clone().unwrap();
         let child_lanes = { p.borrow().child_lanes.clone() };
         p.borrow_mut().child_lanes = merge_lanes(child_lanes, lane.clone());
-        log!("mark_update_lane_from_fiber_to_root {:?}", p);
         let alternate = p.borrow().alternate.clone();
         if alternate.is_some() {
             let alternate = alternate.unwrap();

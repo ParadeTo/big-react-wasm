@@ -259,7 +259,6 @@ impl FiberNode {
                 };
                 wip._ref = c._ref.clone();
             }
-            log!("create wip wip:{:?} current:{:?}", w, c_rc);
             w.clone()
         };
     }

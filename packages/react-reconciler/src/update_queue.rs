@@ -117,11 +117,6 @@ pub fn process_update_queue(
             let mut update = pending.clone().unwrap();
             let update_lane = update.borrow().lane.clone();
             if !is_subset_of_lanes(render_lanes.clone(), update_lane.clone()) {
-                log!(
-                    "underpriority render_lanes:{:?} update_lane:{:?}",
-                    render_lanes.clone(),
-                    update_lane.clone()
-                );
                 // underpriority
                 let clone = Rc::new(RefCell::new(create_update(
                     update.borrow().action.clone().unwrap(),
