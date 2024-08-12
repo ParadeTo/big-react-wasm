@@ -199,8 +199,8 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane, should_time_slice:
         };
     }
 
-    // log!("render over {:?}", *root.clone().borrow());
-    log!("render over {:?}", unsafe { WORK_IN_PROGRESS.clone() });
+    log!("render over {:?}", *root.clone().borrow());
+    // log!("render over {:?}", unsafe { WORK_IN_PROGRESS.clone() });
     // log!("render over");
 
     unsafe {

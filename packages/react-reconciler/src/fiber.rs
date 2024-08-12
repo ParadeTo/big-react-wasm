@@ -90,7 +90,7 @@ impl Debug for FiberNode {
             WorkTag::HostComponent => {
                 write!(
                     f,
-                    "{:?}(key:{:?}, flags:{:?}, subtreeFlags:{:?})",
+                    "{:?}(key:{:?},flags:{:?},subtreeFlags:{:?})",
                     self._type, self.key, self.flags, self.subtree_flags
                 )
                 .expect("print error");
@@ -98,7 +98,7 @@ impl Debug for FiberNode {
             WorkTag::HostText => {
                 write!(
                     f,
-                    "{:?}(state_node:{:?}, flags:{:?})",
+                    "{:?}(state_node:{:?},flags:{:?})",
                     self.tag,
                     Reflect::get(self.pending_props.as_ref(), &JsValue::from_str("content"))
                         .unwrap(),
@@ -109,7 +109,7 @@ impl Debug for FiberNode {
             _ => {
                 write!(
                     f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?}, childLanes:{:?})",
+                    "{:?}(flags:{:?},subtreeFlags:{:?},lanes:{:?},childLanes:{:?})",
                     self._type.as_ref(),
                     self.flags,
                     self.subtree_flags,
@@ -380,7 +380,7 @@ impl Debug for FiberRootNode {
                     }
 
                     if current_ref._return.is_some() {
-                        write!(f, ",").expect("print error");
+                        write!(f, " | ").expect("print error");
                     } else {
                         writeln!(f, "").expect("print error");
                         writeln!(f, "------------------------------------").expect("print error");

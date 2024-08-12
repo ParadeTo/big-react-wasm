@@ -7,15 +7,13 @@ export default function App() {
       ? [<li key='1'>1</li>, <li key='2'>2</li>, <li key='3'>3</li>]
       : [<li key='3'>3</li>, <li key='2'>2</li>, <li key='1'>1</li>]
   return (
-    <div>
-      <span>{num}</span>
-      <ul onClick={() => setNum((num) => num + 1)}>
-        {/* <li>4</li>
+    <ul onClick={() => setNum((num) => num + 1)}>
+      {/* <li>4</li>
       <li>5</li> */}
-        {arr}
+      {arr}
+      <span>{num}</span>
 
-        {/* {num} */}
-      </ul>
-    </div>
+      {/* {num} */}
+    </ul>
   )
 }
