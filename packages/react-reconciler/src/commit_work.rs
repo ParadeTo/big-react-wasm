@@ -228,7 +228,13 @@ fn commit_mutation_effects_on_fiber(
     //     finished_work.borrow().alternate
     // );
     if flags.contains(Flags::Update) {
-        commit_update(finished_work.clone());
+        // commit_update(finished_work.clone());
+        unsafe {
+            HOST_CONFIG
+                .as_ref()
+                .unwrap()
+                .commit_update(finished_work.clone())
+        }
         finished_work.borrow_mut().flags -= Flags::Update;
     }
 
@@ -284,25 +290,25 @@ fn safely_attach_ref(fiber: Rc<RefCell<FiberNode>>) {
     }
 }
 
-fn commit_update(finished_work: Rc<RefCell<FiberNode>>) {
-    let cloned = finished_work.clone();
-    match cloned.borrow().tag {
-        WorkTag::HostText => {
-            let new_content = derive_from_js_value(&cloned.borrow().pending_props, "content");
-            let state_node = FiberNode::derive_state_node(finished_work.clone());
-            log!("commit_update {:?} {:?}", state_node, new_content);
-            if let Some(state_node) = state_node.clone() {
-                unsafe {
-                    HOST_CONFIG
-                        .as_ref()
-                        .unwrap()
-                        .commit_text_update(state_node.clone(), &new_content)
-                }
-            }
-        }
-        _ => log!("commit_update, unsupported type"),
-    };
-}
+// fn commit_update(finished_work: Rc<RefCell<FiberNode>>) {
+//     let cloned = finished_work.clone();
+//     match cloned.borrow().tag {
+//         WorkTag::HostText => {
+//             let new_content = derive_from_js_value(&cloned.borrow().pending_props, "content");
+//             let state_node = FiberNode::derive_state_node(finished_work.clone());
+//             log!("commit_update {:?} {:?}", state_node, new_content);
+//             if let Some(state_node) = state_node.clone() {
+//                 unsafe {
+//                     HOST_CONFIG
+//                         .as_ref()
+//                         .unwrap()
+//                         .commit_text_update(state_node.clone(), &new_content)
+//                 }
+//             }
+//         }
+//         _ => log!("commit_update, unsupported type"),
+//     };
+// }
 
 fn commit_deletion(child_to_delete: Rc<RefCell<FiberNode>>, root: Rc<RefCell<FiberRootNode>>) {
     let first_host_fiber: Rc<RefCell<Option<Rc<RefCell<FiberNode>>>>> = Rc::new(RefCell::new(None));

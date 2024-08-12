@@ -49,3 +49,5 @@
 [从零实现 React v18，但 WASM 版 - [20] 实现 Context](https://www.paradeto.com/2024/07/26/big-react-wasm-20/)
 
 [从零实现 React v18，但 WASM 版 - [21] 性能优化支持 Context](https://www.paradeto.com/2024/07/26/big-react-wasm-21/)
+
+[从零实现 React v18，但 WASM 版 - [22] 实现 memo](https://www.paradeto.com/2024/08/01/big-react-wasm-22/)

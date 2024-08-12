@@ -25,7 +25,7 @@ mod hook_effect_tags;
 mod sync_task_queue;
 mod update_queue;
 mod work_loop;
-mod work_tags;
+pub mod work_tags;
 
 pub static mut HOST_CONFIG: Option<Rc<dyn HostConfig>> = None;
 static mut COMPLETE_WORK: Option<CompleteWork> = None;
@@ -36,7 +36,8 @@ pub trait HostConfig {
     fn append_initial_child(&self, parent: Rc<dyn Any>, child: Rc<dyn Any>);
     fn append_child_to_container(&self, child: Rc<dyn Any>, parent: Rc<dyn Any>);
     fn remove_child(&self, child: Rc<dyn Any>, container: Rc<dyn Any>);
-    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue);
+    // fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue);
+    fn commit_update(&self, fiber: Rc<RefCell<FiberNode>>);
     fn insert_child_to_container(
         &self,
         child: Rc<dyn Any>,
