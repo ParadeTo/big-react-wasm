@@ -230,7 +230,7 @@ pub fn process_update_queue(
         }
 
         if new_base_queue_last.is_none() {
-            new_base_state = result.memoized_state.clone();
+            new_base_state = new_state.clone();
         } else {
             new_base_queue_last.clone().unwrap().borrow_mut().next = new_base_queue_last.clone();
         }

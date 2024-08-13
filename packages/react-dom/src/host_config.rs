@@ -4,12 +4,14 @@ use std::rc::Rc;
 
 use js_sys::JSON::stringify;
 use js_sys::{global, Function, Promise};
+use react_reconciler::work_tags::WorkTag;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
-use web_sys::{window, Node};
+use web_sys::{window, Element, Node};
 
+use react_reconciler::fiber::FiberNode;
 use react_reconciler::HostConfig;
-use shared::{log, type_of};
+use shared::{derive_from_js_value, log, type_of};
 
 use crate::synthetic_event::update_fiber_props;
 
@@ -48,6 +50,13 @@ extern "C" {
     fn hasQueueMicrotask(this: &Global) -> JsValue;
 }
 
+impl ReactDomHostConfig {
+    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue) {
+        let text_instance = text_instance.clone().downcast::<Node>().unwrap();
+        text_instance.set_node_value(Some(to_string(content).as_str()));
+    }
+}
+
 impl HostConfig for ReactDomHostConfig {
     fn create_text_instance(&self, content: &JsValue) -> Rc<dyn Any> {
         let window = window().expect("no global `window` exists");
@@ -62,8 +71,8 @@ impl HostConfig for ReactDomHostConfig {
         let document = window.document().expect("should have a document on window");
         match document.create_element(_type.as_ref()) {
             Ok(element) => {
-                let element = update_fiber_props(
-                    element.clone(),
+                update_fiber_props(
+                    &element.clone(),
                     &*props.clone().downcast::<JsValue>().unwrap(),
                 );
                 Rc::new(Node::from(element))
@@ -110,11 +119,6 @@ impl HostConfig for ReactDomHostConfig {
                 log!("Failed to remove_child {:?} {:?} {:?} ", e, p, c);
             }
         }
-    }
-
-    fn commit_text_update(&self, text_instance: Rc<dyn Any>, content: &JsValue) {
-        let text_instance = text_instance.clone().downcast::<Node>().unwrap();
-        text_instance.set_node_value(Some(to_string(content).as_str()));
     }
 
     fn insert_child_to_container(
@@ -197,5 +201,30 @@ impl HostConfig for ReactDomHostConfig {
             );
             closure_clone.borrow_mut().take().unwrap_throw().forget();
         }
+    }
+
+    fn commit_update(&self, fiber: Rc<RefCell<FiberNode>>) {
+        let instance = FiberNode::derive_state_node(fiber.clone());
+        let memoized_props = fiber.borrow().memoized_props.clone();
+        match fiber.borrow().tag {
+            WorkTag::HostText => {
+                let text = derive_from_js_value(&memoized_props, "content");
+                self.commit_text_update(instance.unwrap(), &text);
+            }
+            WorkTag::HostComponent => {
+                update_fiber_props(
+                    instance
+                        .unwrap()
+                        .downcast::<Node>()
+                        .unwrap()
+                        .dyn_ref::<Element>()
+                        .unwrap(),
+                    &memoized_props,
+                );
+            }
+            _ => {
+                log!("Unsupported update type")
+            }
+        };
     }
 }

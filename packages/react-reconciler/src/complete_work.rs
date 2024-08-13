@@ -143,8 +143,8 @@ impl CompleteWork {
         match tag {
             WorkTag::HostComponent => {
                 if current.is_some() && work_in_progress_cloned.borrow().state_node.is_some() {
-                    // todo compare
-                    // CompleteWork::mark_update(work_in_progress.clone());
+                    // todo: compare props to decide if need to update
+                    CompleteWork::mark_update(work_in_progress.clone());
                     let current = current.unwrap();
                     if !Object::is(
                         &current.borrow()._ref,
