@@ -70,3 +70,17 @@ fs.writeFileSync(
     ? 'const {updateDispatcher} = require("react");\n'
     : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
 )
+
+// add Fragment
+const reactIndexFilename = `${cwd}/dist/react/jsx-dev-runtime.js`
+const reactIndexData = fs.readFileSync(reactIndexFilename)
+fs.writeFileSync(
+  reactIndexFilename,
+  reactIndexData + `export const Fragment='react.fragment';\n`
+)
+const reactTsIndexFilename = `${cwd}/dist/react/jsx-dev-runtime.d.ts`
+const reactTsIndexData = fs.readFileSync(reactTsIndexFilename)
+fs.writeFileSync(
+  reactTsIndexFilename,
+  reactTsIndexData + `export const Fragment: string;\n`
+)

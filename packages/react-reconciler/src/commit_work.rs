@@ -494,8 +494,8 @@ fn get_host_parent(fiber: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode
 fn get_host_sibling(fiber: Rc<RefCell<FiberNode>>) -> Option<Rc<dyn Any>> {
     let mut node = Some(fiber);
     'find_sibling: loop {
-        let node_rc = node.clone().unwrap();
-        while node_rc.borrow().sibling.is_none() {
+        while node.clone().unwrap().borrow().sibling.is_none() {
+            let node_rc = node.clone().unwrap();
             let parent = node_rc.borrow()._return.clone();
             let tag = parent.clone().unwrap().borrow().tag.clone();
             if parent.is_none() || tag == HostComponent || tag == HostRoot {
@@ -515,9 +515,10 @@ fn get_host_sibling(fiber: Rc<RefCell<FiberNode>>) -> Option<Rc<dyn Any>> {
             ._return = _return;
         node = node_rc.borrow().sibling.clone();
 
-        let node_rc = node.clone().unwrap();
-        let tag = node_rc.borrow().tag.clone();
-        while tag != HostText && tag != HostComponent {
+        while node.clone().unwrap().borrow().tag != HostText
+            && node.clone().unwrap().borrow().tag != HostComponent
+        {
+            let node_rc = node.clone().unwrap();
             if node_rc.borrow().flags.contains(Flags::Placement) {
                 continue 'find_sibling;
             }

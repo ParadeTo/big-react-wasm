@@ -171,7 +171,7 @@ pub unsafe fn create_context(default_value: &JsValue) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub unsafe fn memo(_type: &JsValue, compare: &JsValue) -> JsValue {
+pub fn memo(_type: &JsValue, compare: &JsValue) -> JsValue {
     let fiber_type = Object::new();
 
     Reflect::set(

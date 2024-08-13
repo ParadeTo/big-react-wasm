@@ -407,7 +407,7 @@ fn update_state(_: &JsValue) -> Result<Vec<JsValue>, JsValue> {
             base_state: new_base_state,
             base_queue: new_base_queue,
         } = process_update_queue(
-            base_state,
+            base_state.clone(),
             base_queue,
             unsafe { RENDER_LANE.clone() },
             Some(|update: Rc<RefCell<Update>>| {
@@ -474,19 +474,10 @@ fn dispatch_set_state(
     let lane = request_update_lane();
     let mut update = create_update(action.clone(), lane.clone());
     let current = { fiber.borrow().alternate.clone() };
-    log!(
-        "dispatch_set_state {:?} {:?}",
-        fiber.borrow().lanes.clone(),
-        if current.is_none() {
-            Lane::NoLane
-        } else {
-            current.clone().unwrap().borrow().lanes.clone()
-        }
-    );
+    log!("dispatch_set_state action:{:?}", action);
     if fiber.borrow().lanes == Lane::NoLane
         && (current.is_none() || current.unwrap().borrow().lanes == Lane::NoLane)
     {
-        log!("sdadgasd");
         let current_state = update_queue.borrow().last_rendered_state.clone();
         if current_state.is_none() {
             panic!("current state is none")

@@ -1,1 +1,1 @@
-export {default} from './memo'
+export {default} from './fragment'

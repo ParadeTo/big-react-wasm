@@ -121,7 +121,14 @@ pub fn begin_work(
             render_lane.clone(),
         )),
         WorkTag::MemoComponent => update_memo_component(work_in_progress.clone(), render_lane),
+        WorkTag::Fragment => Ok(update_fragment(work_in_progress.clone())),
     };
+}
+
+fn update_fragment(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
+    let next_children = work_in_progress.borrow().pending_props.clone();
+    reconcile_children(work_in_progress.clone(), Some(next_children));
+    work_in_progress.borrow().child.clone()
 }
 
 fn update_memo_component(
