@@ -80,17 +80,6 @@ pub struct FiberNode {
 impl Debug for FiberNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Ok(match self.tag {
-            WorkTag::FunctionComponent => {
-                write!(
-                    f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
-                    self._type.as_ref(),
-                    self.flags,
-                    self.subtree_flags,
-                    self.lanes
-                )
-                .expect("print error");
-            }
             WorkTag::HostRoot => {
                 write!(
                     f,
@@ -100,18 +89,10 @@ impl Debug for FiberNode {
                 )
                 .expect("print error");
             }
-            WorkTag::HostComponent => {
-                write!(
-                    f,
-                    "{:?}(key:{:?}, flags:{:?}, subtreeFlags:{:?})",
-                    self._type, self.key, self.flags, self.subtree_flags
-                )
-                .expect("print error");
-            }
             WorkTag::HostText => {
                 write!(
                     f,
-                    "{:?}(state_node:{:?}, flags:{:?})",
+                    "{:?}(state_node:{:?},flags:{:?})",
                     self.tag,
                     Reflect::get(self.pending_props.as_ref(), &JsValue::from_str("content"))
                         .unwrap(),
@@ -119,25 +100,17 @@ impl Debug for FiberNode {
                 )
                 .expect("print error");
             }
-            WorkTag::ContextProvider => {
+            _ => {
                 write!(
                     f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
+                    "{:?}(tag:{:?},key:{:?}flags:{:?},subtreeFlags:{:?},lanes:{:?},childLanes:{:?})",
                     self._type.as_ref(),
+                    self.tag,
+                    self.key,
                     self.flags,
                     self.subtree_flags,
-                    self.lanes
-                )
-                .expect("print error");
-            }
-            WorkTag::MemoComponent => {
-                write!(
-                    f,
-                    "{:?}(flags:{:?}, subtreeFlags:{:?}, lanes:{:?})",
-                    self._type.as_ref(),
-                    self.flags,
-                    self.subtree_flags,
-                    self.lanes
+                    self.lanes,
+                    self.child_lanes
                 )
                 .expect("print error");
             }
@@ -169,6 +142,10 @@ impl FiberNode {
             _ref,
             dependencies: None,
         }
+    }
+
+    pub fn create_fiber_from_fragment(elements: JsValue, key: JsValue) -> FiberNode {
+        FiberNode::new(WorkTag::Fragment, elements, key, JsValue::null())
     }
 
     pub fn create_fiber_from_element(ele: &JsValue) -> Self {
@@ -401,7 +378,7 @@ impl Debug for FiberRootNode {
                     }
 
                     if current_ref._return.is_some() {
-                        write!(f, ",").expect("print error");
+                        write!(f, " | ").expect("print error");
                     } else {
                         writeln!(f, "").expect("print error");
                         writeln!(f, "------------------------------------").expect("print error");

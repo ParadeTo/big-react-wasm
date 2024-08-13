@@ -72,12 +72,12 @@ pub fn mark_update_lane_from_fiber_to_root(
         let p = parent.clone().unwrap();
         let child_lanes = { p.borrow().child_lanes.clone() };
         p.borrow_mut().child_lanes = merge_lanes(child_lanes, lane.clone());
-
         let alternate = p.borrow().alternate.clone();
         if alternate.is_some() {
             let alternate = alternate.unwrap();
             let child_lanes = { alternate.borrow().child_lanes.clone() };
             alternate.borrow_mut().child_lanes = merge_lanes(child_lanes, lane.clone());
+            log!("mark_update_lane_from_fiber_to_root alternate {:?}", p);
         }
 
         node = parent.clone().unwrap();
@@ -198,8 +198,8 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane, should_time_slice:
         };
     }
 
-    // log!("render over {:?}", *root.clone().borrow());
-    log!("render over {:?}", unsafe { WORK_IN_PROGRESS.clone() });
+    log!("render over {:?}", *root.clone().borrow());
+    // log!("render over {:?}", unsafe { WORK_IN_PROGRESS.clone() });
     // log!("render over");
 
     unsafe {

@@ -84,3 +84,13 @@ fs.writeFileSync(
   reactTsIndexFilename,
   reactTsIndexData + `export const Suspense: string;\n`
 )
+
+// add Fragment
+fs.writeFileSync(
+  reactIndexFilename,
+  reactIndexData + `export const Fragment='react.fragment';\n`
+)
+fs.writeFileSync(
+  reactTsIndexFilename,
+  reactTsIndexData + `export const Fragment: string;\n`
+)

@@ -7,6 +7,7 @@ pub static REACT_CONTEXT_TYPE: &str = "react.context";
 pub static REACT_PROVIDER_TYPE: &str = "react.provider";
 pub static REACT_MEMO_TYPE: &str = "react.memo";
 pub static REACT_SUSPENSE_TYPE: &str = "react.suspense";
+pub static REACT_FRAGMENT_TYPE: &str = "react.fragment";
 
 #[macro_export]
 macro_rules! log {
