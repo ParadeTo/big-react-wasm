@@ -1,10 +1,10 @@
 # How to start?
 
-* install wasm-pack
-* `npm run build`
-* cd `examples/hello-world`
-* `pnpm install`
-* `npm run dev`
+- install wasm-pack
+- `npm run build`
+- cd `examples/hello-world`
+- `pnpm install`
+- `npm run dev`
 
 # Articles
 
@@ -18,3 +18,8 @@
 
 [从零实现 React v18，但 WASM 版 - [5] 实现 Render 流程的 completeWork 阶段](https://www.paradeto.com/2024/04/15/big-react-wasm-5/)
 
+[从零实现 React v18，但 WASM 版 - [6] 实现 Commit 流程](https://www.paradeto.com/2024/04/16/big-react-wasm-6/)
+
+[从零实现 React v18，但 WASM 版 - [7] 支持 FunctionComponent 类型](https://www.paradeto.com/2024/04/19/big-react-wasm-7/)
+
+[从零实现 React v18，但 WASM 版 - [8] 支持 Hooks](https://www.paradeto.com/2024/04/22/big-react-wasm-8/)

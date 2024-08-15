@@ -11,7 +11,9 @@ use crate::fiber_hooks::render_with_hooks;
 use crate::update_queue::process_update_queue;
 use crate::work_tags::WorkTag;
 
-pub fn begin_work(work_in_progress: Rc<RefCell<FiberNode>>) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
+pub fn begin_work(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
     let tag = work_in_progress.clone().borrow().tag.clone();
     return match tag {
         WorkTag::FunctionComponent => update_function_component(work_in_progress.clone()),

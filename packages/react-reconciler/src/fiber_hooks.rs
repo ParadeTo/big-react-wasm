@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
-use wasm_bindgen::prelude::{Closure, wasm_bindgen};
 use web_sys::js_sys::{Function, Object, Reflect};
 
 use shared::log;
@@ -40,7 +40,9 @@ impl Hook {
 fn update_mount_hooks_to_dispatcher() {
     let object = Object::new();
 
-    let closure = Closure::wrap(Box::new(mount_state) as Box<dyn Fn(&JsValue) -> Result<Vec<JsValue>, JsValue>>);
+    let closure = Closure::wrap(
+        Box::new(mount_state) as Box<dyn Fn(&JsValue) -> Result<Vec<JsValue>, JsValue>>
+    );
     let function = closure.as_ref().unchecked_ref::<Function>().clone();
     closure.forget();
     Reflect::set(&object, &"use_state".into(), &function).expect("TODO: panic set use_state");
