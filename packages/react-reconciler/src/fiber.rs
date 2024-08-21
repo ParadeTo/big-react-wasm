@@ -144,6 +144,15 @@ impl FiberNode {
         }
     }
 
+    pub fn create_fiber_from_offscreen(pending_props: JsValue) -> FiberNode {
+        FiberNode::new(
+            WorkTag::OffscreenComponent,
+            pending_props,
+            JsValue::null(),
+            JsValue::null(),
+        )
+    }
+
     pub fn create_fiber_from_fragment(elements: JsValue, key: JsValue) -> FiberNode {
         FiberNode::new(WorkTag::Fragment, elements, key, JsValue::null())
     }
@@ -281,6 +290,8 @@ pub struct FiberRootNode {
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
     pub pending_lanes: Lane,
     pub finished_lanes: Lane,
+    pub suspended_lanes: Lane,
+    pub pinged_lanes: Lane,
     pub callback_node: Option<Task>,
     pub callback_priority: Lane,
     pub pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>,
@@ -300,6 +311,8 @@ impl FiberRootNode {
             })),
             callback_node: None,
             callback_priority: Lane::NoLane,
+            pinged_lanes: Lane::NoLane,
+            suspended_lanes: Lane::NoLane,
         }
     }
 

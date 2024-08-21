@@ -4,7 +4,7 @@ use std::rc::Rc;
 use wasm_bindgen::{JsCast, JsValue};
 
 use shared::{derive_from_js_value, is_dev, log, shallow_equal};
-use web_sys::js_sys::{Function, Object};
+use web_sys::js_sys::{Function, Object, Reflect};
 
 use crate::child_fiber::{clone_child_fiblers, mount_child_fibers, reconcile_child_fibers};
 use crate::fiber::{FiberNode, MemoizedState};
@@ -123,7 +123,8 @@ pub fn begin_work(
         )),
         WorkTag::MemoComponent => update_memo_component(work_in_progress.clone(), render_lane),
         WorkTag::Fragment => Ok(update_fragment(work_in_progress.clone())),
-        WorkTag::SuspenseComponent => todo!(),
+        WorkTag::SuspenseComponent => Ok(update_suspense_component(work_in_progress.clone())),
+        WorkTag::OffscreenComponent => todo!(),
     };
 }
 
@@ -131,11 +132,127 @@ fn mount_suspense_fallback_children(
     work_in_progress: Rc<RefCell<FiberNode>>,
     primary_children: JsValue,
     fallback_children: JsValue,
-) {
-    // let primary_child_props
+) -> Rc<RefCell<FiberNode>> {
+    let primary_child_props = Object::new();
+    Reflect::set(&primary_child_props, &"mode".into(), &"hidden".into());
+    Reflect::set(&primary_child_props, &"children".into(), &primary_children);
+
+    let primary_child_fragment = Rc::new(RefCell::new(FiberNode::create_fiber_from_offscreen(
+        primary_child_props.into(),
+    )));
+    let fallback_child_fragment = Rc::new(RefCell::new(FiberNode::create_fiber_from_fragment(
+        fallback_children,
+        JsValue::null(),
+    )));
+
+    fallback_child_fragment.borrow_mut().flags |= Flags::Placement;
+
+    primary_child_fragment.borrow_mut()._return = Some(work_in_progress.clone());
+    fallback_child_fragment.borrow_mut()._return = Some(work_in_progress.clone());
+    primary_child_fragment.borrow_mut().sibling = Some(fallback_child_fragment.clone());
+    work_in_progress.borrow_mut().child = Some(primary_child_fragment.clone());
+
+    fallback_child_fragment
 }
 
-fn update_suspense_component(work_in_progress: Rc<RefCell<FiberNode>>) {
+fn update_suspense_fallback_children(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    primary_children: JsValue,
+    fallback_children: JsValue,
+) -> Rc<RefCell<FiberNode>> {
+    let current = { work_in_progress.borrow().alternate.clone().unwrap() };
+    let current_primary_child_fragment = current.borrow().child.clone().unwrap();
+    let current_fallback_child_fragment = current_primary_child_fragment.borrow().sibling.clone();
+
+    let primary_child_props = Object::new();
+    Reflect::set(&primary_child_props, &"mode".into(), &"hidden".into());
+    Reflect::set(&primary_child_props, &"children".into(), &primary_children);
+
+    let primary_child_fragment = FiberNode::create_work_in_progress(
+        current_primary_child_fragment,
+        primary_child_props.into(),
+    );
+
+    let mut fallback_child_fragment;
+
+    if current_fallback_child_fragment.is_some() {
+        fallback_child_fragment = FiberNode::create_work_in_progress(
+            current_fallback_child_fragment.unwrap(),
+            fallback_children,
+        );
+    } else {
+        fallback_child_fragment = Rc::new(RefCell::new(FiberNode::create_fiber_from_fragment(
+            fallback_children,
+            JsValue::null(),
+        )));
+        fallback_child_fragment.borrow_mut().flags |= Flags::Placement;
+    }
+
+    primary_child_fragment.borrow_mut()._return = Some(work_in_progress.clone());
+    fallback_child_fragment.borrow_mut()._return = Some(work_in_progress.clone());
+    primary_child_fragment.borrow_mut().sibling = Some(fallback_child_fragment.clone());
+    work_in_progress.borrow_mut().child = Some(primary_child_fragment.clone());
+
+    fallback_child_fragment
+}
+
+fn mount_suspense_primary_children(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    primary_children: JsValue,
+) -> Rc<RefCell<FiberNode>> {
+    let primary_child_props = Object::new();
+    Reflect::set(&primary_child_props, &"mode".into(), &"visible".into());
+    Reflect::set(&primary_child_props, &"children".into(), &primary_children);
+
+    let primary_child_fragment = Rc::new(RefCell::new(FiberNode::create_fiber_from_offscreen(
+        primary_child_props.into(),
+    )));
+
+    primary_child_fragment.borrow_mut()._return = Some(work_in_progress.clone());
+    work_in_progress.borrow_mut().child = Some(primary_child_fragment.clone());
+
+    primary_child_fragment
+}
+
+fn update_suspense_primary_children(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    primary_children: JsValue,
+) -> Rc<RefCell<FiberNode>> {
+    let current = { work_in_progress.borrow().alternate.clone().unwrap() };
+    let current_primary_child_fragment = current.borrow().child.clone().unwrap();
+    let current_fallback_child_fragment = current_primary_child_fragment.borrow().sibling.clone();
+
+    let primary_child_props = Object::new();
+    Reflect::set(&primary_child_props, &"mode".into(), &"visible".into());
+    Reflect::set(&primary_child_props, &"children".into(), &primary_children);
+
+    let primary_child_fragment = FiberNode::create_work_in_progress(
+        current_primary_child_fragment.clone(),
+        primary_child_props.into(),
+    );
+
+    primary_child_fragment.borrow_mut()._return = Some(work_in_progress.clone());
+    primary_child_fragment.borrow_mut().sibling = None;
+    work_in_progress.borrow_mut().child = Some(primary_child_fragment.clone());
+
+    if current_fallback_child_fragment.is_some() {
+        let current_fallback_child_fragment = current_fallback_child_fragment.unwrap();
+        let mut deletions = &work_in_progress.borrow().deletions;
+        if deletions.is_empty() {
+            work_in_progress.borrow_mut().deletions = vec![current_fallback_child_fragment];
+            work_in_progress.borrow_mut().flags != Flags::ChildDeletion;
+        } else {
+            let deletions = &mut work_in_progress.borrow_mut().deletions;
+            deletions.push(current_primary_child_fragment)
+        }
+    }
+
+    primary_child_fragment
+}
+
+fn update_suspense_component(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+) -> Option<Rc<RefCell<FiberNode>>> {
     let current = { work_in_progress.borrow().alternate.clone() };
     let next_props = { work_in_progress.borrow().pending_props.clone() };
 
@@ -154,11 +271,29 @@ fn update_suspense_component(work_in_progress: Rc<RefCell<FiberNode>>) {
 
     if current.is_none() {
         if show_fallback {
-            return mount_suspense_fallback_children(
+            return Some(mount_suspense_fallback_children(
                 work_in_progress.clone(),
                 next_primary_children.clone(),
                 next_fallback_children.clone(),
-            );
+            ));
+        } else {
+            return Some(mount_suspense_primary_children(
+                work_in_progress.clone(),
+                next_primary_children.clone(),
+            ));
+        }
+    } else {
+        if show_fallback {
+            return Some(update_suspense_fallback_children(
+                work_in_progress.clone(),
+                next_primary_children.clone(),
+                next_fallback_children.clone(),
+            ));
+        } else {
+            return Some(update_suspense_primary_children(
+                work_in_progress.clone(),
+                next_primary_children.clone(),
+            ));
         }
     }
 }
