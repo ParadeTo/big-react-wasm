@@ -124,7 +124,7 @@ pub fn begin_work(
         WorkTag::MemoComponent => update_memo_component(work_in_progress.clone(), render_lane),
         WorkTag::Fragment => Ok(update_fragment(work_in_progress.clone())),
         WorkTag::SuspenseComponent => Ok(update_suspense_component(work_in_progress.clone())),
-        WorkTag::OffscreenComponent => todo!(),
+        WorkTag::OffscreenComponent => Ok(update_offscreen_component(work_in_progress)),
     };
 }
 
@@ -268,7 +268,7 @@ fn update_suspense_component(
     let next_primary_children = derive_from_js_value(&next_props, "children");
     let next_fallback_children = derive_from_js_value(&next_props, "fallback");
     push_suspense_handler(work_in_progress.clone());
-
+    log!("show_fallback {:?}", show_fallback);
     if current.is_none() {
         if show_fallback {
             return Some(mount_suspense_fallback_children(
@@ -296,6 +296,15 @@ fn update_suspense_component(
             ));
         }
     }
+}
+
+fn update_offscreen_component(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+) -> Option<Rc<RefCell<FiberNode>>> {
+    let next_props = work_in_progress.borrow().pending_props.clone();
+    let next_children = derive_from_js_value(&next_props, "children");
+    reconcile_children(work_in_progress.clone(), Some(next_children));
+    work_in_progress.borrow().child.clone()
 }
 
 fn update_fragment(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
