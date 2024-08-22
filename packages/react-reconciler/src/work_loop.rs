@@ -97,7 +97,7 @@ pub fn mark_update_lane_from_fiber_to_root(
     None
 }
 
-fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
+pub fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
     let root_cloned = root.clone();
     let update_lanes = root_cloned.borrow().get_next_lanes();
     let existing_callback = root_cloned.borrow().callback_node.clone();
@@ -510,10 +510,10 @@ fn unwind_unit_of_work(unit_of_work: Rc<RefCell<FiberNode>>) {
     loop {
         let unwrapped_work = incomplete_work.clone().unwrap();
         let next = unwind_work(unwrapped_work.clone());
-
         if next.is_some() {
             let next = next.unwrap();
             next.borrow_mut().flags &= get_host_effect_mask();
+            unsafe { WORK_IN_PROGRESS = Some(next) };
             return;
         }
 
