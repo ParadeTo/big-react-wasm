@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use shared::{derive_from_js_value, log, type_of};
+use shared::{derive_from_js_value, type_of};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::js_sys::Function;
 
@@ -17,7 +17,8 @@ fn attach_ping_listener(root: Rc<RefCell<FiberRootNode>>, wakeable: JsValue, lan
         ensure_root_is_scheduled(root.clone());
     }) as Box<dyn Fn()>);
     let ping = closure.as_ref().unchecked_ref::<Function>().clone();
-    then.call2(&JsValue::null(), &ping, &ping)
+    closure.forget();
+    then.call2(&wakeable, &ping, &ping)
         .expect("failed to call then function");
 }
 

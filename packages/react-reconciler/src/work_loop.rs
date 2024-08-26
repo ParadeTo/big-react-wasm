@@ -180,6 +180,12 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane, should_time_slice: 
                 WORK_IN_PROGRESS_SUSPENDED_REASON = NOT_SUSPENDED;
                 WORK_IN_PROGRESS_THROWN_VALUE = None;
 
+                // TODO
+                mark_update_lane_from_fiber_to_root(
+                    WORK_IN_PROGRESS.clone().unwrap(),
+                    lane.clone(),
+                );
+
                 throw_and_unwind_work_loop(
                     root.clone(),
                     WORK_IN_PROGRESS.clone().unwrap(),
@@ -501,7 +507,7 @@ fn throw_and_unwind_work_loop(
     thrown_value: JsValue,
     lane: Lane,
 ) {
-    throw_exception(root.clone(), thrown_value, lane);
+    throw_exception(root.clone(), thrown_value, lane.clone());
     unwind_unit_of_work(unit_of_work);
 }
 

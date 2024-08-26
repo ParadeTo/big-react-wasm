@@ -10,6 +10,5 @@ export default function App() {
 
 function Child() {
   debugger
-  throw Promise.resolve(1)
-  return <p>Child</p>
+  throw new Promise((resolve) => setTimeout(resolve, 1000))
 }

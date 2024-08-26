@@ -83,10 +83,12 @@ impl Debug for FiberNode {
             WorkTag::HostRoot => {
                 write!(
                     f,
-                    "{:?}(subtreeFlags:{:?}),flags:{:?})",
+                    "{:?}(flags:{:?},subtreeFlags:{:?}),lanes:{:?},childLanes:{:?})",
                     WorkTag::HostRoot,
+                    self.flags,
                     self.subtree_flags,
-                    self.flags
+                    self.lanes,
+                    self.child_lanes
                 )
                 .expect("print error");
             }
