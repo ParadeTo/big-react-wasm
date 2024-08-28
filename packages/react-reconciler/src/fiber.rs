@@ -9,7 +9,9 @@ use scheduler::Task;
 use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
-use shared::{derive_from_js_value, log, type_of, REACT_MEMO_TYPE, REACT_PROVIDER_TYPE};
+use shared::{
+    derive_from_js_value, log, type_of, REACT_MEMO_TYPE, REACT_PROVIDER_TYPE, REACT_SUSPENSE_TYPE,
+};
 
 use crate::fiber_context::ContextItem;
 use crate::fiber_flags::Flags;
@@ -81,9 +83,12 @@ impl Debug for FiberNode {
             WorkTag::HostRoot => {
                 write!(
                     f,
-                    "{:?}(subtreeFlags:{:?})",
+                    "{:?}(flags:{:?},subtreeFlags:{:?}),lanes:{:?},childLanes:{:?})",
                     WorkTag::HostRoot,
-                    self.subtree_flags
+                    self.flags,
+                    self.subtree_flags,
+                    self.lanes,
+                    self.child_lanes
                 )
                 .expect("print error");
             }
@@ -142,6 +147,15 @@ impl FiberNode {
         }
     }
 
+    pub fn create_fiber_from_offscreen(pending_props: JsValue) -> FiberNode {
+        FiberNode::new(
+            WorkTag::OffscreenComponent,
+            pending_props,
+            JsValue::null(),
+            JsValue::null(),
+        )
+    }
+
     pub fn create_fiber_from_fragment(elements: JsValue, key: JsValue) -> FiberNode {
         FiberNode::new(WorkTag::Fragment, elements, key, JsValue::null())
     }
@@ -153,7 +167,10 @@ impl FiberNode {
         let _ref = derive_from_js_value(ele, "ref");
 
         let mut fiber_tag = WorkTag::FunctionComponent;
-        if _type.is_string() {
+
+        if _type == REACT_SUSPENSE_TYPE {
+            fiber_tag = WorkTag::SuspenseComponent
+        } else if _type.is_string() {
             fiber_tag = WorkTag::HostComponent
         } else if type_of(&_type, "object") {
             let _typeof = derive_from_js_value(&_type, "$$typeof");
@@ -276,6 +293,8 @@ pub struct FiberRootNode {
     pub finished_work: Option<Rc<RefCell<FiberNode>>>,
     pub pending_lanes: Lane,
     pub finished_lanes: Lane,
+    pub suspended_lanes: Lane,
+    pub pinged_lanes: Lane,
     pub callback_node: Option<Task>,
     pub callback_priority: Lane,
     pub pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>,
@@ -295,6 +314,8 @@ impl FiberRootNode {
             })),
             callback_node: None,
             callback_priority: Lane::NoLane,
+            pinged_lanes: Lane::NoLane,
+            suspended_lanes: Lane::NoLane,
         }
     }
 

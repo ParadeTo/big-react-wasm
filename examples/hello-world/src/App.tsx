@@ -1,1 +1,1 @@
-export {default} from './fragment'
+export {default} from './suspense'

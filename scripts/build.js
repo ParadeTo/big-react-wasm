@@ -71,16 +71,18 @@ fs.writeFileSync(
     : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
 )
 
-// add Fragment
-const reactIndexFilename = `${cwd}/dist/react/jsx-dev-runtime.js`
+// add Suspense + Fragment
+const reactIndexFilename = `${cwd}/dist/react/index.js`
 const reactIndexData = fs.readFileSync(reactIndexFilename)
 fs.writeFileSync(
   reactIndexFilename,
-  reactIndexData + `export const Fragment='react.fragment';\n`
+  reactIndexData +
+    `export const Suspense='react.suspense';\nexport const Fragment='react.fragment';\n`
 )
-const reactTsIndexFilename = `${cwd}/dist/react/jsx-dev-runtime.d.ts`
+const reactTsIndexFilename = `${cwd}/dist/react/index.d.ts`
 const reactTsIndexData = fs.readFileSync(reactTsIndexFilename)
 fs.writeFileSync(
   reactTsIndexFilename,
-  reactTsIndexData + `export const Fragment: string;\n`
+  reactTsIndexData +
+    `export const Suspense: string;\nexport const Fragment: string;\n`
 )
