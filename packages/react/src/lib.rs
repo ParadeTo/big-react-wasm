@@ -150,6 +150,12 @@ pub unsafe fn use_context(context: &JsValue) -> Result<JsValue, JsValue> {
     use_context.call1(&JsValue::null(), context)
 }
 
+#[wasm_bindgen(js_name = use)]
+pub unsafe fn _use(usable: &JsValue) -> Result<JsValue, JsValue> {
+    let _use = &CURRENT_DISPATCHER.current.as_ref().unwrap()._use;
+    _use.call1(&JsValue::null(), usable)
+}
+
 #[wasm_bindgen(js_name = createContext)]
 pub unsafe fn create_context(default_value: &JsValue) -> JsValue {
     let context = Object::new();

@@ -9,6 +9,9 @@ export default function App() {
 }
 
 function Child() {
-  debugger
-  throw new Promise((resolve) => setTimeout(resolve, 1000))
+  try {
+    throw new Promise((resolve) => setTimeout(resolve, 1000))
+  } catch (error) {
+    debugger
+  }
 }
