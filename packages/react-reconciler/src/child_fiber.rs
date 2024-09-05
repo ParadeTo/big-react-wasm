@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use wasm_bindgen::{JsCast, JsValue};
@@ -12,6 +11,7 @@ use crate::fiber::FiberNode;
 use crate::fiber_flags::Flags;
 use crate::work_tags::WorkTag;
 use crate::work_tags::WorkTag::HostText;
+use crate::JsValueKey;
 
 fn use_fiber(fiber: Rc<RefCell<FiberNode>>, pending_props: JsValue) -> Rc<RefCell<FiberNode>> {
     let clone = FiberNode::create_work_in_progress(fiber, pending_props);
@@ -133,7 +133,7 @@ fn reconcile_single_element(
         }
     }
 
-    let mut fiber ;
+    let mut fiber;
     if derive_from_js_value(&element, "type") == REACT_FRAGMENT_TYPE {
         let props = derive_from_js_value(&element, "props");
         let children = derive_from_js_value(&props, "children");
@@ -141,7 +141,7 @@ fn reconcile_single_element(
     } else {
         fiber = FiberNode::create_fiber_from_element(element);
     }
-   
+
     fiber._return = Some(return_fiber.clone());
     Rc::new(RefCell::new(fiber))
 }
@@ -190,35 +190,12 @@ fn reconcile_single_text_node(
     Rc::new(RefCell::new(created))
 }
 
-#[derive(Clone, Debug)]
-struct Key(JsValue);
-
-impl PartialEq for Key {
-    fn eq(&self, other: &Self) -> bool {
-        Object::is(&self.0, &other.0)
-    }
-}
-
-impl Eq for Key {}
-
-impl Hash for Key {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        if self.0.is_string() {
-            self.0.as_string().unwrap().hash(state)
-        } else if let Some(n) = self.0.as_f64() {
-            n.to_bits().hash(state)
-        } else if self.0.is_null() {
-            "null".hash(state)
-        }
-    }
-}
-
 fn update_fragment(
     return_fiber: Rc<RefCell<FiberNode>>,
     current: Option<Rc<RefCell<FiberNode>>>,
     elements: JsValue,
-    key: Key,
-    existing_children: &mut HashMap<Key, Rc<RefCell<FiberNode>>>,
+    key: JsValueKey,
+    existing_children: &mut HashMap<JsValueKey, Rc<RefCell<FiberNode>>>,
 ) -> Rc<RefCell<FiberNode>> {
     let fiber;
     if current.is_none() || current.clone().unwrap().borrow().tag != WorkTag::Fragment {
@@ -235,7 +212,7 @@ fn update_fragment(
 
 fn update_from_map(
     return_fiber: Rc<RefCell<FiberNode>>,
-    existing_children: &mut HashMap<Key, Rc<RefCell<FiberNode>>>,
+    existing_children: &mut HashMap<JsValueKey, Rc<RefCell<FiberNode>>>,
     index: u32,
     element: &JsValue,
     should_track_effects: bool,
@@ -255,13 +232,15 @@ fn update_from_map(
             false => key.clone(),
         }
     }
-    let before = existing_children.get(&Key(key_to_use.clone())).clone();
+    let before = existing_children
+        .get(&JsValueKey(key_to_use.clone()))
+        .clone();
     if type_of(element, "null") || type_of(element, "string") || type_of(element, "number") {
         let props = create_props_with_content(element.clone());
         // log!("update_from_map {:?}", props);
         if before.is_some() {
             let before = (*before.clone().unwrap()).clone();
-            existing_children.remove(&Key(key_to_use.clone()));
+            existing_children.remove(&JsValueKey(key_to_use.clone()));
             if before.borrow().tag == HostText {
                 return Some(use_fiber(before.clone(), props.clone()));
             } else {
@@ -287,7 +266,7 @@ fn update_from_map(
             return_fiber,
             before,
             (*element).clone(),
-            Key(key_to_use.clone()),
+            JsValueKey(key_to_use.clone()),
             existing_children,
         ));
     } else if type_of(element, "object") && !element.is_null() {
@@ -301,14 +280,14 @@ fn update_from_map(
                     return_fiber,
                     before,
                     (*element).clone(),
-                    Key(key_to_use.clone()),
+                    JsValueKey(key_to_use.clone()),
                     existing_children,
                 ));
             }
 
             if before.is_some() {
                 let before = (*before.clone().unwrap()).clone();
-                existing_children.remove(&Key(key_to_use.clone()));
+                existing_children.remove(&JsValueKey(key_to_use.clone()));
                 if Object::is(
                     &before.borrow()._type,
                     &derive_from_js_value(&(*element).clone(), "type"),
@@ -346,7 +325,7 @@ fn reconcile_children_array(
     // 创建的第一个fiber
     let mut first_new_fiber: Option<Rc<RefCell<FiberNode>>> = None;
 
-    let mut existing_children: HashMap<Key, Rc<RefCell<FiberNode>>> = HashMap::new();
+    let mut existing_children: HashMap<JsValueKey, Rc<RefCell<FiberNode>>> = HashMap::new();
     let mut current = current_first_child;
     while current.is_some() {
         let current_rc = current.unwrap();
@@ -354,7 +333,7 @@ fn reconcile_children_array(
             true => JsValue::from(current_rc.borrow().index),
             false => current_rc.borrow().key.clone(),
         };
-        existing_children.insert(Key(key_to_use), current_rc.clone());
+        existing_children.insert(JsValueKey(key_to_use), current_rc.clone());
         current = current_rc.borrow().sibling.clone();
     }
     // log!("existing_children {:?}", existing_children.keys());

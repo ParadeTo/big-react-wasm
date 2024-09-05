@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use scheduler::{unstable_get_current_priority_level, Priority};
 use std::cell::RefCell;
-use std::pin;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use crate::fiber::FiberRootNode;
@@ -24,6 +24,12 @@ impl PartialEq for Lane {
 }
 
 impl Eq for Lane {}
+
+impl Hash for Lane {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.bits().hash(state);
+    }
+}
 
 pub fn get_highest_priority(lanes: Lane) -> Lane {
     let lanes = lanes.bits();

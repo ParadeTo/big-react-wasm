@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Array, Function, Object, Reflect};
 
-use shared::{derive_from_js_value, is_dev, log, type_of};
+use shared::{derive_from_js_value, is_dev, log, type_of, REACT_CONTEXT_TYPE};
 
 use crate::begin_work::mark_wip_received_update;
 use crate::fiber::{FiberNode, MemoizedState};
@@ -159,7 +159,7 @@ fn update_hooks_to_dispatcher(is_update: bool) {
 
     // use
     let use_closure =
-        Closure::wrap(Box::new(_use) as Box<dyn Fn(&JsValue) -> Result<JsValue, JsValue>>);
+        Closure::wrap(Box::new(_use) as Box<dyn Fn(JsValue) -> Result<JsValue, JsValue>>);
     let use_fn = use_closure.as_ref().unchecked_ref::<Function>().clone();
     use_closure.forget();
 
@@ -756,9 +756,21 @@ fn read_context(context: JsValue) -> JsValue {
     read_context_origin(consumer, context)
 }
 
-fn _use(usable: &JsValue) -> Result<JsValue, JsValue> {
-    track_used_thenable(usable)
-    // if !usable.is_null() && type_of(usable, "object") {
-    //     if derive_from_js_value(usable, "then").is_function() {}
-    // }
+fn _use(usable: JsValue) -> Result<JsValue, JsValue> {
+    if !usable.is_null() && type_of(&usable, "object") {
+        if derive_from_js_value(&usable, "then").is_function() {
+            return track_used_thenable(usable);
+        } else if derive_from_js_value(&usable, "$$typeof") == REACT_CONTEXT_TYPE {
+            return Ok(read_context(usable));
+        }
+    }
+    Err(JsValue::from_str("Not supported use arguments"))
+}
+
+pub fn reset_hooks_on_unwind(wip: Rc<RefCell<FiberNode>>) {
+    unsafe {
+        CURRENTLY_RENDERING_FIBER = None;
+        CURRENT_HOOK = None;
+        WORK_IN_PROGRESS_HOOK = None;
+    }
 }

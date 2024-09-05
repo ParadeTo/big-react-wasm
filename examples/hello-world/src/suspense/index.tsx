@@ -9,9 +9,6 @@ export default function App() {
 }
 
 function Child() {
-  try {
-    use(new Promise((resolve) => setTimeout(resolve, 1000)))
-  } catch (error) {
-    debugger
-  }
+  const a = use(new Promise((resolve) => setTimeout(() => resolve(1), 1000)))
+  return <span>{a}</span>
 }
