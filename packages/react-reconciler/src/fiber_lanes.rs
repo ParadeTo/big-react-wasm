@@ -1,5 +1,10 @@
 use bitflags::bitflags;
 use scheduler::{unstable_get_current_priority_level, Priority};
+use std::cell::RefCell;
+use std::pin;
+use std::rc::Rc;
+
+use crate::fiber::FiberRootNode;
 
 bitflags! {
     #[derive(Debug, Clone)]
@@ -67,4 +72,15 @@ pub fn include_some_lanes(set: Lane, subset: Lane) -> bool {
 
 pub fn remove_lanes(set: Lane, subset: Lane) -> Lane {
     return set - subset;
+}
+
+pub fn mark_root_pinged(root: Rc<RefCell<FiberRootNode>>, pinged_lane: Lane) {
+    let suspended_lanes: Lane = { root.borrow().suspended_lanes.clone() };
+    root.borrow_mut().pinged_lanes |= suspended_lanes & pinged_lane;
+}
+
+pub fn mark_root_suspended(root: Rc<RefCell<FiberRootNode>>, suspended_lane: Lane) {
+    let suspended_lanes = { root.borrow().suspended_lanes.clone() };
+    root.borrow_mut().suspended_lanes |= suspended_lane;
+    root.borrow_mut().pinged_lanes -= suspended_lanes;
 }

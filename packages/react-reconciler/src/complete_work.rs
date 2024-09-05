@@ -11,6 +11,7 @@ use crate::fiber::{FiberNode, StateNode};
 use crate::fiber_context::pop_provider;
 use crate::fiber_flags::Flags;
 use crate::fiber_lanes::{merge_lanes, Lane};
+use crate::suspense_context::pop_suspense_handler;
 use crate::work_tags::WorkTag;
 use crate::HostConfig;
 
@@ -212,6 +213,30 @@ impl CompleteWork {
                 self.bubble_properties(work_in_progress.clone());
                 None
             }
+            // WorkTag::SuspenseComponent => {
+            //     pop_suspense_handler();
+            //     let offscreen_fiber = work_in_progress.borrow().child.clone().unwrap();
+            //     let is_hidden =
+            //         derive_from_js_value(&offscreen_fiber.borrow().pending_props, "mode")
+            //             .as_string()
+            //             .unwrap()
+            //             == "hidden";
+            //     let current_offscreen_fiber = offscreen_fiber.borrow().alternate.clone();
+            //     if current_offscreen_fiber.is_some() {
+            //         let current_offscreen_fiber = current_offscreen_fiber.unwrap();
+            //         let was_hidden = derive_from_js_value(
+            //             &current_offscreen_fiber.borrow().pending_props,
+            //             "mode",
+            //         )
+            //         .as_string()
+            //         .unwrap()
+            //             == "hidden";
+            //         if is_hidden != was_hidden {
+            //             offscreen_fiber.borrow_mut().flags !=
+            //         }
+            //     }
+            //     None
+            // }
             _ => {
                 self.bubble_properties(work_in_progress.clone());
                 None

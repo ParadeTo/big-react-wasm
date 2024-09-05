@@ -6,5 +6,7 @@ pub enum WorkTag {
     HostText = 6,
     Fragment = 7,
     ContextProvider = 8,
+    SuspenseComponent = 13,
+    OffscreenComponent = 14,
     MemoComponent = 15,
 }
