@@ -1,4 +1,4 @@
-import {Suspense} from 'react'
+import {Suspense, use} from 'react'
 
 export default function App() {
   return (
@@ -10,7 +10,7 @@ export default function App() {
 
 function Child() {
   try {
-    throw new Promise((resolve) => setTimeout(resolve, 1000))
+    use(new Promise((resolve) => setTimeout(resolve, 1000)))
   } catch (error) {
     debugger
   }

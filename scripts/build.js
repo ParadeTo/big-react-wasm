@@ -45,18 +45,23 @@ packageJson.files.push(
 )
 fs.writeFileSync(packageJsonFilename, JSON.stringify(packageJson))
 
+const code1 = isTest
+  ? `
+const {updateDispatcher} = require("react");
+const SUSPENSE_EXCEPTION = new Error("It's not a true mistake, but part of Suspense's job. If you catch the error, keep throwing it out");
+`
+  : `
+import {updateDispatcher} from "react";
+const SUSPENSE_EXCEPTION = new Error("It's not a true mistake, but part of Suspense's job. If you catch the error, keep throwing it out");
+`
+
 if (isTest) {
   // modify react-noop/index_bg.js
   const reactNoopIndexFilename = isTest
     ? `${cwd}/dist/react-noop/index.js`
     : `${cwd}/dist/react-noop/index_bg.js`
   const reactNoopIndexBgData = fs.readFileSync(reactNoopIndexFilename)
-  fs.writeFileSync(
-    reactNoopIndexFilename,
-    (isTest
-      ? 'const {updateDispatcher} = require("react");\n'
-      : 'import {updateDispatcher} from "react";\n') + reactNoopIndexBgData
-  )
+  fs.writeFileSync(reactNoopIndexFilename, code1 + reactNoopIndexBgData)
 }
 
 // modify react-dom/index_bg.js
@@ -64,12 +69,7 @@ const reactDomIndexFilename = isTest
   ? `${cwd}/dist/react-dom/index.js`
   : `${cwd}/dist/react-dom/index_bg.js`
 const reactDomIndexBgData = fs.readFileSync(reactDomIndexFilename)
-fs.writeFileSync(
-  reactDomIndexFilename,
-  (isTest
-    ? 'const {updateDispatcher} = require("react");\n'
-    : 'import {updateDispatcher} from "react";\n') + reactDomIndexBgData
-)
+fs.writeFileSync(reactDomIndexFilename, code1 + reactDomIndexBgData)
 
 // add Suspense + Fragment
 const reactIndexFilename = `${cwd}/dist/react/index.js`

@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::error::Error;
 use std::rc::Rc;
 
 use wasm_bindgen::prelude::{wasm_bindgen, Closure};
@@ -13,7 +12,7 @@ use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_context::read_context as read_context_origin;
 use crate::fiber_flags::Flags;
 use crate::fiber_lanes::{merge_lanes, remove_lanes, request_update_lane, Lane};
-use crate::thenable::{track_used_thenable, SuspenseException};
+use crate::thenable::track_used_thenable;
 use crate::update_queue::{
     create_update, create_update_queue, enqueue_update, process_update_queue,
     ReturnOfProcessUpdateQueue, Update, UpdateQueue,
