@@ -1,4 +1,21 @@
-import {Suspense} from 'react'
+import {Suspense, use} from 'react'
+
+const delay = (t) =>
+  new Promise((r) => {
+    setTimeout(r, t)
+  })
+
+const cachePool: any[] = []
+
+function fetchData(id, timeout) {
+  const cache = cachePool[id]
+  if (cache) {
+    return cache
+  }
+  return (cachePool[id] = delay(timeout).then(() => {
+    return {data: Math.random().toFixed(2) * 100}
+  }))
+}
 
 export default function App() {
   return (
@@ -9,6 +26,7 @@ export default function App() {
 }
 
 function Child() {
-  debugger
-  throw new Promise((resolve) => setTimeout(resolve, 1000))
+  const {data} = use(fetchData(1, 1000))
+
+  return <span>{data}</span>
 }

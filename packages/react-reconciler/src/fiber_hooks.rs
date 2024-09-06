@@ -5,13 +5,14 @@ use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Array, Function, Object, Reflect};
 
-use shared::{derive_from_js_value, is_dev, log};
+use shared::{derive_from_js_value, is_dev, log, type_of, REACT_CONTEXT_TYPE};
 
 use crate::begin_work::mark_wip_received_update;
 use crate::fiber::{FiberNode, MemoizedState};
 use crate::fiber_context::read_context as read_context_origin;
 use crate::fiber_flags::Flags;
 use crate::fiber_lanes::{merge_lanes, remove_lanes, request_update_lane, Lane};
+use crate::thenable::track_used_thenable;
 use crate::update_queue::{
     create_update, create_update_queue, enqueue_update, process_update_queue,
     ReturnOfProcessUpdateQueue, Update, UpdateQueue,
@@ -136,25 +137,31 @@ fn update_hooks_to_dispatcher(is_update: bool) {
     use_memo_closure.forget();
 
     // use_callback
-    let use_callback_clusure = Closure::wrap(Box::new(if is_update {
+    let use_callback_closure = Closure::wrap(Box::new(if is_update {
         update_callback
     } else {
         mount_callback
     }) as Box<dyn Fn(Function, JsValue) -> JsValue>);
-    let use_callback = use_callback_clusure
+    let use_callback = use_callback_closure
         .as_ref()
         .unchecked_ref::<Function>()
         .clone();
-    use_callback_clusure.forget();
+    use_callback_closure.forget();
 
     // use_context
-    let use_context_clusure =
+    let use_context_closure =
         Closure::wrap(Box::new(read_context) as Box<dyn Fn(JsValue) -> JsValue>);
-    let use_context = use_context_clusure
+    let use_context = use_context_closure
         .as_ref()
         .unchecked_ref::<Function>()
         .clone();
-    use_context_clusure.forget();
+    use_context_closure.forget();
+
+    // use
+    let use_closure =
+        Closure::wrap(Box::new(_use) as Box<dyn Fn(JsValue) -> Result<JsValue, JsValue>>);
+    let use_fn = use_closure.as_ref().unchecked_ref::<Function>().clone();
+    use_closure.forget();
 
     Reflect::set(&object, &"use_state".into(), &use_state).expect("TODO: panic set use_state");
     Reflect::set(&object, &"use_effect".into(), &use_effect).expect("TODO: panic set use_effect");
@@ -164,6 +171,7 @@ fn update_hooks_to_dispatcher(is_update: bool) {
         .expect("TODO: panic set use_callback");
     Reflect::set(&object, &"use_context".into(), &use_context)
         .expect("TODO: panic set use_context");
+    Reflect::set(&object, &"use".into(), &use_fn).expect("TODO: panic set use");
 
     updateDispatcher(&object.into());
 }
@@ -746,4 +754,23 @@ fn update_callback(callback: Function, deps: JsValue) -> JsValue {
 fn read_context(context: JsValue) -> JsValue {
     let consumer = unsafe { CURRENTLY_RENDERING_FIBER.clone() };
     read_context_origin(consumer, context)
+}
+
+fn _use(usable: JsValue) -> Result<JsValue, JsValue> {
+    if !usable.is_null() && type_of(&usable, "object") {
+        if derive_from_js_value(&usable, "then").is_function() {
+            return track_used_thenable(usable);
+        } else if derive_from_js_value(&usable, "$$typeof") == REACT_CONTEXT_TYPE {
+            return Ok(read_context(usable));
+        }
+    }
+    Err(JsValue::from_str("Not supported use arguments"))
+}
+
+pub fn reset_hooks_on_unwind(wip: Rc<RefCell<FiberNode>>) {
+    unsafe {
+        CURRENTLY_RENDERING_FIBER = None;
+        CURRENT_HOOK = None;
+        WORK_IN_PROGRESS_HOOK = None;
+    }
 }

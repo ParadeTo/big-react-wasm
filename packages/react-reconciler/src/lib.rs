@@ -1,8 +1,9 @@
 use std::any::Any;
 use std::cell::RefCell;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-
 use wasm_bindgen::JsValue;
+use web_sys::js_sys::Object;
 
 use crate::complete_work::CompleteWork;
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
@@ -92,5 +93,28 @@ impl Reconciler {
             schedule_update_on_fiber(host_root_fiber, root_render_priority);
         }
         element.clone()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct JsValueKey(JsValue);
+
+impl PartialEq for JsValueKey {
+    fn eq(&self, other: &Self) -> bool {
+        Object::is(&self.0, &other.0)
+    }
+}
+
+impl Eq for JsValueKey {}
+
+impl Hash for JsValueKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        if self.0.is_string() {
+            self.0.as_string().unwrap().hash(state)
+        } else if let Some(n) = self.0.as_f64() {
+            n.to_bits().hash(state)
+        } else if self.0.is_null() {
+            "null".hash(state)
+        }
     }
 }

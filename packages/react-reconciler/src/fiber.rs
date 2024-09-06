@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
@@ -19,6 +19,7 @@ use crate::fiber_hooks::{Effect, Hook};
 use crate::fiber_lanes::{get_highest_priority, merge_lanes, Lane};
 use crate::update_queue::{Update, UpdateQueue};
 use crate::work_tags::WorkTag;
+use crate::JsValueKey;
 
 #[derive(Debug)]
 pub enum StateNode {
@@ -294,10 +295,11 @@ pub struct FiberRootNode {
     pub pending_lanes: Lane,
     pub finished_lanes: Lane,
     pub suspended_lanes: Lane,
-    pub pinged_lanes: Lane,
+    pub pinged_lanes: Lane, // Records the processed suspended lanes, comes from suspended lanes
     pub callback_node: Option<Task>,
     pub callback_priority: Lane,
     pub pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>,
+    pub ping_cache: Option<HashMap<JsValueKey, Rc<RefCell<HashSet<Lane>>>>>,
 }
 
 impl FiberRootNode {
@@ -316,6 +318,7 @@ impl FiberRootNode {
             callback_priority: Lane::NoLane,
             pinged_lanes: Lane::NoLane,
             suspended_lanes: Lane::NoLane,
+            ping_cache: None,
         }
     }
 
@@ -325,6 +328,15 @@ impl FiberRootNode {
 
     pub fn mark_root_updated(&mut self, lane: Lane) {
         self.pending_lanes = merge_lanes(self.pending_lanes.clone(), lane)
+    }
+
+    pub fn mark_root_pinged(&mut self, pinged_lane: Lane) {
+        self.pinged_lanes |= self.suspended_lanes.clone() & pinged_lane;
+    }
+
+    pub fn mark_root_suspended(&mut self, suspended_lane: Lane) {
+        self.suspended_lanes |= suspended_lane.clone();
+        self.pinged_lanes -= suspended_lane;
     }
 
     pub fn get_next_lanes(&self) -> Lane {

@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::js_sys::Function;
+use web_sys::js_sys::{Function, Object};
 
 use scheduler::{
     unstable_cancel_callback, unstable_schedule_callback_no_delay, unstable_should_yield_to_host,
@@ -18,12 +18,14 @@ use crate::commit_work::{
 };
 use crate::fiber::{FiberNode, FiberRootNode, PendingPassiveEffects, StateNode};
 use crate::fiber_flags::{get_host_effect_mask, get_mutation_mask, get_passive_mask, Flags};
+use crate::fiber_hooks::reset_hooks_on_unwind;
 use crate::fiber_lanes::{
     get_highest_priority, lanes_to_scheduler_priority, mark_root_suspended, merge_lanes, Lane,
 };
 use crate::fiber_throw::throw_exception;
 use crate::fiber_unwind_work::unwind_work;
 use crate::sync_task_queue::{flush_sync_callbacks, schedule_sync_callback};
+use crate::thenable::{get_suspense_thenable, SUSPENSE_EXCEPTION};
 use crate::work_tags::WorkTag;
 use crate::{COMPLETE_WORK, HOST_CONFIG};
 
@@ -71,7 +73,6 @@ pub fn mark_update_lane_from_fiber_to_root(
             let alternate = alternate.unwrap();
             let child_lanes = { alternate.borrow().child_lanes.clone() };
             alternate.borrow_mut().child_lanes = merge_lanes(child_lanes, lane.clone());
-            log!("mark_update_lane_from_fiber_to_root alternate {:?}", p);
         }
 
         node = parent.clone().unwrap();
@@ -494,9 +495,20 @@ fn complete_unit_of_work(fiber: Rc<RefCell<FiberNode>>) {
     }
 }
 
-fn handle_throw(root: Rc<RefCell<FiberRootNode>>, thrown_value: JsValue) {
+fn handle_throw(root: Rc<RefCell<FiberRootNode>>, mut thrown_value: JsValue) {
+    /*
+        throw possibilities:
+            1. use thenable
+            2. error (Error Boundary)
+    */
+    if Object::is(&thrown_value, &SUSPENSE_EXCEPTION) {
+        unsafe { WORK_IN_PROGRESS_SUSPENDED_REASON = SUSPENDED_ON_DATA };
+        thrown_value = get_suspense_thenable();
+    } else {
+        // TODO
+    }
+
     unsafe {
-        WORK_IN_PROGRESS_SUSPENDED_REASON = SUSPENDED_ON_DATA;
         WORK_IN_PROGRESS_THROWN_VALUE = Some(thrown_value);
     }
 }
@@ -507,6 +519,7 @@ fn throw_and_unwind_work_loop(
     thrown_value: JsValue,
     lane: Lane,
 ) {
+    reset_hooks_on_unwind(unit_of_work.clone());
     throw_exception(root.clone(), thrown_value, lane.clone());
     unwind_unit_of_work(unit_of_work);
 }
