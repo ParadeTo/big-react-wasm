@@ -5,7 +5,7 @@ use std::rc::Rc;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Function, Reflect};
 
-use shared::{derive_from_js_value, log, type_of};
+use shared::{is_dev, log, type_of};
 use web_sys::Node;
 
 use crate::fiber::{FiberNode, FiberRootNode, StateNode};
@@ -290,59 +290,63 @@ fn safely_attach_ref(fiber: Rc<RefCell<FiberNode>>) {
     }
 }
 
-// fn commit_update(finished_work: Rc<RefCell<FiberNode>>) {
-//     let cloned = finished_work.clone();
-//     match cloned.borrow().tag {
-//         WorkTag::HostText => {
-//             let new_content = derive_from_js_value(&cloned.borrow().pending_props, "content");
-//             let state_node = FiberNode::derive_state_node(finished_work.clone());
-//             log!("commit_update {:?} {:?}", state_node, new_content);
-//             if let Some(state_node) = state_node.clone() {
-//                 unsafe {
-//                     HOST_CONFIG
-//                         .as_ref()
-//                         .unwrap()
-//                         .commit_text_update(state_node.clone(), &new_content)
-//                 }
-//             }
-//         }
-//         _ => log!("commit_update, unsupported type"),
-//     };
-// }
+fn record_host_children_to_delete(
+    children_to_delete: &mut Vec<Rc<RefCell<FiberNode>>>,
+    unmount_fiber: Rc<RefCell<FiberNode>>,
+) {
+    let len = children_to_delete.len();
+    if len == 0 {
+        children_to_delete.push(unmount_fiber.clone());
+    } else {
+        let last_one = &children_to_delete[len - 1];
+        let mut node_option = last_one.borrow().sibling.clone();
+        while node_option.is_some() {
+            let node = node_option.unwrap();
+            if Rc::ptr_eq(&unmount_fiber, &node) {
+                children_to_delete.push(unmount_fiber.clone());
+            }
+            node_option = node.borrow().sibling.clone();
+        }
+    }
+}
 
 fn commit_deletion(child_to_delete: Rc<RefCell<FiberNode>>, root: Rc<RefCell<FiberRootNode>>) {
-    let first_host_fiber: Rc<RefCell<Option<Rc<RefCell<FiberNode>>>>> = Rc::new(RefCell::new(None));
+    let mut root_children_to_delete: Vec<Rc<RefCell<FiberNode>>> = vec![];
+
     commit_nested_unmounts(child_to_delete.clone(), |unmount_fiber| {
-        let cloned = first_host_fiber.clone();
         match unmount_fiber.borrow().tag {
             FunctionComponent => {
                 commit_passive_effect(unmount_fiber.clone(), root.clone(), "unmount");
             }
             HostComponent => {
-                if cloned.borrow().is_none() {
-                    *cloned.borrow_mut() = Some(unmount_fiber.clone());
-                }
+                record_host_children_to_delete(&mut root_children_to_delete, unmount_fiber.clone());
+                safely_detach_ref(unmount_fiber.clone());
             }
             HostText => {
-                if cloned.borrow().is_none() {
-                    *cloned.borrow_mut() = Some(unmount_fiber.clone());
+                record_host_children_to_delete(&mut root_children_to_delete, unmount_fiber.clone());
+            }
+            _ => {
+                if is_dev() {
+                    log!("unsupported unmount type {:?}", unmount_fiber);
                 }
             }
-            _ => todo!(),
         };
     });
 
-    let first_host_fiber = first_host_fiber.clone();
-    if first_host_fiber.borrow().is_some() {
-        let host_parent_state_node =
-            FiberNode::derive_state_node(get_host_parent(child_to_delete.clone()).unwrap());
-        let first_host_fiber_state_node =
-            FiberNode::derive_state_node((*first_host_fiber.borrow()).clone().unwrap());
-        unsafe {
-            HOST_CONFIG.as_ref().unwrap().remove_child(
-                first_host_fiber_state_node.unwrap(),
-                host_parent_state_node.unwrap(),
-            )
+    if !root_children_to_delete.is_empty() {
+        let host_parent = get_host_parent(child_to_delete.clone());
+        if host_parent.is_some() {
+            let host_parent = host_parent.unwrap();
+            for child in root_children_to_delete {
+                let node = FiberNode::derive_state_node(child.clone());
+                let host_parent_state_node = FiberNode::derive_state_node(host_parent.clone());
+                unsafe {
+                    HOST_CONFIG
+                        .as_ref()
+                        .unwrap()
+                        .remove_child(node.unwrap(), host_parent_state_node.unwrap())
+                }
+            }
         }
     }
 
@@ -350,9 +354,10 @@ fn commit_deletion(child_to_delete: Rc<RefCell<FiberNode>>, root: Rc<RefCell<Fib
     child_to_delete.clone().borrow_mut().child = None;
 }
 
-fn commit_nested_unmounts<F>(root: Rc<RefCell<FiberNode>>, on_commit_unmount: F)
+// depth-first traversal
+fn commit_nested_unmounts<F>(root: Rc<RefCell<FiberNode>>, mut on_commit_unmount: F)
 where
-    F: Fn(Rc<RefCell<FiberNode>>),
+    F: FnMut(Rc<RefCell<FiberNode>>),
 {
     let mut node = root.clone();
     loop {

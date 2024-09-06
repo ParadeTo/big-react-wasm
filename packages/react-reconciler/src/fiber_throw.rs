@@ -41,7 +41,7 @@ fn attach_ping_listener(root: Rc<RefCell<FiberRootNode>>, wakeable: JsValue, lan
 
     let mut thread_ids = ping_cache.get(&JsValueKey(wakeable.clone())).unwrap();
 
-    if thread_ids.borrow().contains(&lane) {
+    if !thread_ids.borrow().contains(&lane) {
         thread_ids.borrow_mut().insert(lane.clone());
         let then_value = derive_from_js_value(&wakeable, "then");
         let then = then_value.dyn_ref::<Function>().unwrap();

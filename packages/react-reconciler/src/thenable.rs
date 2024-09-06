@@ -21,9 +21,7 @@ pub fn get_suspense_thenable() -> JsValue {
 
 pub fn track_used_thenable(thenable: JsValue) -> Result<JsValue, JsValue> {
     let status = derive_from_js_value(&thenable, "status");
-
     if status.is_string() {
-        let status = status.as_string().unwrap();
         if status == "fulfilled" {
             return Ok(derive_from_js_value(&thenable, "value"));
         } else if status == "rejected" {

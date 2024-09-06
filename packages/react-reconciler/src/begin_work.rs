@@ -51,56 +51,48 @@ pub fn begin_work(
     work_in_progress: Rc<RefCell<FiberNode>>,
     render_lane: Lane,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
-    log!("begin_work {:?}", work_in_progress);
+    log!("begin_work {:?}", work_in_progress.clone());
     unsafe {
         DID_RECEIVE_UPDATE = false;
     };
-    let current = { work_in_progress.borrow().alternate.clone() };
 
-    if current.is_some() {
-        let current = current.clone().unwrap();
-        let old_props = current.borrow().memoized_props.clone();
-        let old_type = current.borrow()._type.clone();
-        let new_props = work_in_progress.borrow().pending_props.clone();
-        let new_type = work_in_progress.borrow()._type.clone();
-        if !Object::is(&old_props, &new_props) || !Object::is(&old_type, &new_type) {
-            unsafe { DID_RECEIVE_UPDATE = true }
-        } else {
-            let has_scheduled_update_or_context =
-                check_scheduled_update_or_context(current.clone(), render_lane.clone());
-            // The current fiber lane is not included in render_lane
-            // TODO context
-            if !has_scheduled_update_or_context {
-                unsafe { DID_RECEIVE_UPDATE = false }
-                // // if current.is_some() {
-                // let c = current.clone();
-                // log!(
-                //     "current tag:{:?} lanes:{:?} child_lanes:{:?} render_lane:{:?}",
-                //     c.borrow().tag,
-                //     c.borrow().lanes,
-                //     c.borrow().child_lanes,
-                //     render_lane
-                // );
-                // // }
-                match work_in_progress.borrow().tag {
-                    WorkTag::ContextProvider => {
-                        let new_value = derive_from_js_value(
-                            &work_in_progress.borrow().memoized_props,
-                            "value",
-                        );
-                        let context =
-                            derive_from_js_value(&work_in_progress.borrow()._type, "_context");
-                        push_provider(&context, new_value);
-                    }
-                    _ => {}
-                }
-                return Ok(bailout_on_already_finished_work(
-                    work_in_progress,
-                    render_lane,
-                ));
-            }
-        }
-    }
+    // TODO work with suspense
+    // let current = { work_in_progress.borrow().alternate.clone() };
+
+    // if current.is_some() {
+    //     let current = current.clone().unwrap();
+    //     let old_props = current.borrow().memoized_props.clone();
+    //     let old_type = current.borrow()._type.clone();
+    //     let new_props = work_in_progress.borrow().pending_props.clone();
+    //     let new_type = work_in_progress.borrow()._type.clone();
+    //     if !Object::is(&old_props, &new_props) || !Object::is(&old_type, &new_type) {
+    //         unsafe { DID_RECEIVE_UPDATE = true }
+    //     } else {
+    //         let has_scheduled_update_or_context =
+    //             check_scheduled_update_or_context(current.clone(), render_lane.clone());
+    //         // The current fiber lane is not included in render_lane
+    //         // TODO context
+    //         if !has_scheduled_update_or_context {
+    //             unsafe { DID_RECEIVE_UPDATE = false }
+    //             match work_in_progress.borrow().tag {
+    //                 WorkTag::ContextProvider => {
+    //                     let new_value = derive_from_js_value(
+    //                         &work_in_progress.borrow().memoized_props,
+    //                         "value",
+    //                     );
+    //                     let context =
+    //                         derive_from_js_value(&work_in_progress.borrow()._type, "_context");
+    //                     push_provider(&context, new_value);
+    //                 }
+    //                 _ => {}
+    //             }
+    //             return Ok(bailout_on_already_finished_work(
+    //                 work_in_progress,
+    //                 render_lane,
+    //             ));
+    //         }
+    //     }
+    // }
 
     work_in_progress.borrow_mut().lanes = Lane::NoLane;
     // if current.is_some() {
@@ -124,7 +116,7 @@ pub fn begin_work(
         WorkTag::MemoComponent => update_memo_component(work_in_progress.clone(), render_lane),
         WorkTag::Fragment => Ok(update_fragment(work_in_progress.clone())),
         WorkTag::SuspenseComponent => Ok(update_suspense_component(work_in_progress.clone())),
-        WorkTag::OffscreenComponent => Ok(update_offscreen_component(work_in_progress)),
+        WorkTag::OffscreenComponent => Ok(update_offscreen_component(work_in_progress.clone())),
     };
 }
 
@@ -161,8 +153,9 @@ fn update_suspense_fallback_children(
     fallback_children: JsValue,
 ) -> Rc<RefCell<FiberNode>> {
     let current = { work_in_progress.borrow().alternate.clone().unwrap() };
-    let current_primary_child_fragment = current.borrow().child.clone().unwrap();
-    let current_fallback_child_fragment = current_primary_child_fragment.borrow().sibling.clone();
+    let current_primary_child_fragment = { current.borrow().child.clone().unwrap() };
+    let current_fallback_child_fragment =
+        { current_primary_child_fragment.borrow().sibling.clone() };
 
     let primary_child_props = Object::new();
     Reflect::set(&primary_child_props, &"mode".into(), &"hidden".into());
@@ -219,8 +212,9 @@ fn update_suspense_primary_children(
     primary_children: JsValue,
 ) -> Rc<RefCell<FiberNode>> {
     let current = { work_in_progress.borrow().alternate.clone().unwrap() };
-    let current_primary_child_fragment = current.borrow().child.clone().unwrap();
-    let current_fallback_child_fragment = current_primary_child_fragment.borrow().sibling.clone();
+    let current_primary_child_fragment = { current.borrow().child.clone().unwrap() };
+    let current_fallback_child_fragment =
+        { current_primary_child_fragment.borrow().sibling.clone() };
 
     let primary_child_props = Object::new();
     Reflect::set(&primary_child_props, &"mode".into(), &"visible".into());
@@ -237,13 +231,13 @@ fn update_suspense_primary_children(
 
     if current_fallback_child_fragment.is_some() {
         let current_fallback_child_fragment = current_fallback_child_fragment.unwrap();
-        let mut deletions = &work_in_progress.borrow().deletions;
+        let mut deletions = { work_in_progress.borrow().deletions.clone() };
         if deletions.is_empty() {
             work_in_progress.borrow_mut().deletions = vec![current_fallback_child_fragment];
-            work_in_progress.borrow_mut().flags != Flags::ChildDeletion;
+            work_in_progress.borrow_mut().flags |= Flags::ChildDeletion;
         } else {
             let deletions = &mut work_in_progress.borrow_mut().deletions;
-            deletions.push(current_primary_child_fragment)
+            deletions.push(current_fallback_child_fragment)
         }
     }
 
@@ -257,8 +251,8 @@ fn update_suspense_component(
     let next_props = { work_in_progress.borrow().pending_props.clone() };
 
     let mut show_fallback = false;
-    let did_suspend =
-        (work_in_progress.borrow().flags.clone() & Flags::DidCapture) != Flags::NoFlags;
+    let flags = { work_in_progress.borrow().flags.clone() };
+    let did_suspend = (flags & Flags::DidCapture) != Flags::NoFlags;
 
     if did_suspend {
         show_fallback = true;
@@ -301,14 +295,14 @@ fn update_suspense_component(
 fn update_offscreen_component(
     work_in_progress: Rc<RefCell<FiberNode>>,
 ) -> Option<Rc<RefCell<FiberNode>>> {
-    let next_props = work_in_progress.borrow().pending_props.clone();
+    let next_props = { work_in_progress.borrow().pending_props.clone() };
     let next_children = derive_from_js_value(&next_props, "children");
     reconcile_children(work_in_progress.clone(), Some(next_children));
     work_in_progress.borrow().child.clone()
 }
 
 fn update_fragment(work_in_progress: Rc<RefCell<FiberNode>>) -> Option<Rc<RefCell<FiberNode>>> {
-    let next_children = work_in_progress.borrow().pending_props.clone();
+    let next_children = { work_in_progress.borrow().pending_props.clone() };
     reconcile_children(work_in_progress.clone(), Some(next_children));
     work_in_progress.borrow().child.clone()
 }
@@ -392,7 +386,7 @@ fn update_function_component(
     let next_children =
         render_with_hooks(work_in_progress.clone(), Component, render_lane.clone())?;
 
-    let current = work_in_progress.borrow().alternate.clone();
+    let current = { work_in_progress.borrow().alternate.clone() };
     log!("{:?} {:?}", work_in_progress.clone(), unsafe {
         DID_RECEIVE_UPDATE
     });
