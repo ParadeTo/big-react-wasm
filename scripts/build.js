@@ -12,11 +12,20 @@ execSync(
     isTest ? '--target nodejs' : ''
   }`
 )
+
 execSync(
   `wasm-pack build packages/react --out-dir ${cwd}/dist/react --out-name index ${
     isTest ? '--target nodejs' : ''
   }`
 )
+
+if (isTest) {
+  execSync(
+    `wasm-pack build packages/react-noop --out-dir ${cwd}/dist/react-noop --out-name index ${
+      isTest ? '--target nodejs' : ''
+    }`
+  )
+}
 execSync(
   `wasm-pack build packages/react-dom --out-dir ${cwd}/dist/react-dom --out-name index ${
     isTest ? '--target nodejs' : ''
@@ -35,6 +44,20 @@ packageJson.files.push(
   'jsx-dev-runtime_bg.wasm'
 )
 fs.writeFileSync(packageJsonFilename, JSON.stringify(packageJson))
+
+if (isTest) {
+  // modify react-noop/index_bg.js
+  const reactNoopIndexFilename = isTest
+    ? `${cwd}/dist/react-noop/index.js`
+    : `${cwd}/dist/react-noop/index_bg.js`
+  const reactNoopIndexBgData = fs.readFileSync(reactNoopIndexFilename)
+  fs.writeFileSync(
+    reactNoopIndexFilename,
+    (isTest
+      ? 'const {updateDispatcher} = require("react");\n'
+      : 'import {updateDispatcher} from "react";\n') + reactNoopIndexBgData
+  )
+}
 
 // modify react-dom/index_bg.js
 const reactDomIndexFilename = isTest
