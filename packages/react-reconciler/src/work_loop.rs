@@ -520,7 +520,12 @@ fn throw_and_unwind_work_loop(
     lane: Lane,
 ) {
     reset_hooks_on_unwind(unit_of_work.clone());
-    throw_exception(root.clone(), thrown_value, lane.clone());
+    throw_exception(
+        root.clone(),
+        unit_of_work.clone(),
+        thrown_value,
+        lane.clone(),
+    );
     unwind_unit_of_work(unit_of_work);
 }
 

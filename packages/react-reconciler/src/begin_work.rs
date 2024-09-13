@@ -57,42 +57,44 @@ pub fn begin_work(
     };
 
     // TODO work with suspense
-    // let current = { work_in_progress.borrow().alternate.clone() };
+    let current = { work_in_progress.borrow().alternate.clone() };
 
-    // if current.is_some() {
-    //     let current = current.clone().unwrap();
-    //     let old_props = current.borrow().memoized_props.clone();
-    //     let old_type = current.borrow()._type.clone();
-    //     let new_props = work_in_progress.borrow().pending_props.clone();
-    //     let new_type = work_in_progress.borrow()._type.clone();
-    //     if !Object::is(&old_props, &new_props) || !Object::is(&old_type, &new_type) {
-    //         unsafe { DID_RECEIVE_UPDATE = true }
-    //     } else {
-    //         let has_scheduled_update_or_context =
-    //             check_scheduled_update_or_context(current.clone(), render_lane.clone());
-    //         // The current fiber lane is not included in render_lane
-    //         // TODO context
-    //         if !has_scheduled_update_or_context {
-    //             unsafe { DID_RECEIVE_UPDATE = false }
-    //             match work_in_progress.borrow().tag {
-    //                 WorkTag::ContextProvider => {
-    //                     let new_value = derive_from_js_value(
-    //                         &work_in_progress.borrow().memoized_props,
-    //                         "value",
-    //                     );
-    //                     let context =
-    //                         derive_from_js_value(&work_in_progress.borrow()._type, "_context");
-    //                     push_provider(&context, new_value);
-    //                 }
-    //                 _ => {}
-    //             }
-    //             return Ok(bailout_on_already_finished_work(
-    //                 work_in_progress,
-    //                 render_lane,
-    //             ));
-    //         }
-    //     }
-    // }
+    if current.is_some() {
+        let current = current.clone().unwrap();
+        let old_props = current.borrow().memoized_props.clone();
+        let old_type = current.borrow()._type.clone();
+        let new_props = work_in_progress.borrow().pending_props.clone();
+        let new_type = work_in_progress.borrow()._type.clone();
+        if !Object::is(&old_props, &new_props) || !Object::is(&old_type, &new_type) {
+            unsafe { DID_RECEIVE_UPDATE = true }
+        } else {
+            let has_scheduled_update_or_context =
+                check_scheduled_update_or_context(current.clone(), render_lane.clone());
+            // The current fiber lane is not included in render_lane
+            // TODO context
+            if !has_scheduled_update_or_context
+                && current.borrow().tag != WorkTag::SuspenseComponent
+            {
+                unsafe { DID_RECEIVE_UPDATE = false }
+                match work_in_progress.borrow().tag {
+                    WorkTag::ContextProvider => {
+                        let new_value = derive_from_js_value(
+                            &work_in_progress.borrow().memoized_props,
+                            "value",
+                        );
+                        let context =
+                            derive_from_js_value(&work_in_progress.borrow()._type, "_context");
+                        push_provider(&context, new_value);
+                    }
+                    _ => {}
+                }
+                return Ok(bailout_on_already_finished_work(
+                    work_in_progress,
+                    render_lane,
+                ));
+            }
+        }
+    }
 
     work_in_progress.borrow_mut().lanes = Lane::NoLane;
     // if current.is_some() {

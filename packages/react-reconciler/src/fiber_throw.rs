@@ -9,11 +9,20 @@ use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::js_sys::Function;
 
 use crate::{
-    fiber::FiberRootNode, fiber_flags::Flags, fiber_lanes::Lane,
-    suspense_context::get_suspense_handler, work_loop::ensure_root_is_scheduled, JsValueKey,
+    fiber::{FiberNode, FiberRootNode},
+    fiber_flags::Flags,
+    fiber_lanes::Lane,
+    suspense_context::get_suspense_handler,
+    work_loop::{ensure_root_is_scheduled, mark_update_lane_from_fiber_to_root},
+    JsValueKey,
 };
 
-fn attach_ping_listener(root: Rc<RefCell<FiberRootNode>>, wakeable: JsValue, lane: Lane) {
+fn attach_ping_listener(
+    root: Rc<RefCell<FiberRootNode>>,
+    source_fiber: Rc<RefCell<FiberNode>>,
+    wakeable: JsValue,
+    lane: Lane,
+) {
     let mut ping_cache_option: Option<HashMap<JsValueKey, Rc<RefCell<HashSet<Lane>>>>> =
         root.borrow().ping_cache.clone();
     let mut ping_cache: HashMap<JsValueKey, Rc<RefCell<HashSet<Lane>>>>;
@@ -54,6 +63,7 @@ fn attach_ping_listener(root: Rc<RefCell<FiberRootNode>>, wakeable: JsValue, lan
             }
             root.clone().borrow_mut().mark_root_updated(lane.clone());
             root.clone().borrow_mut().mark_root_pinged(lane.clone());
+            mark_update_lane_from_fiber_to_root(source_fiber.clone(), lane.clone());
             ensure_root_is_scheduled(root.clone());
         }) as Box<dyn Fn()>);
         let ping = closure.as_ref().unchecked_ref::<Function>().clone();
@@ -63,7 +73,12 @@ fn attach_ping_listener(root: Rc<RefCell<FiberRootNode>>, wakeable: JsValue, lan
     }
 }
 
-pub fn throw_exception(root: Rc<RefCell<FiberRootNode>>, value: JsValue, lane: Lane) {
+pub fn throw_exception(
+    root: Rc<RefCell<FiberRootNode>>,
+    source_fiber: Rc<RefCell<FiberNode>>,
+    value: JsValue,
+    lane: Lane,
+) {
     if !value.is_null()
         && type_of(&value, "object")
         && derive_from_js_value(&value, "then").is_function()
@@ -74,6 +89,6 @@ pub fn throw_exception(root: Rc<RefCell<FiberRootNode>>, value: JsValue, lane: L
             suspense_boundary.borrow_mut().flags |= Flags::ShouldCapture;
         }
 
-        attach_ping_listener(root, value, lane)
+        attach_ping_listener(root, source_fiber, value, lane)
     }
 }
