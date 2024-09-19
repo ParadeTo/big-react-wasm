@@ -57,42 +57,44 @@ pub fn begin_work(
     };
 
     // TODO work with suspense
-    // let current = { work_in_progress.borrow().alternate.clone() };
+    let current = { work_in_progress.borrow().alternate.clone() };
 
-    // if current.is_some() {
-    //     let current = current.clone().unwrap();
-    //     let old_props = current.borrow().memoized_props.clone();
-    //     let old_type = current.borrow()._type.clone();
-    //     let new_props = work_in_progress.borrow().pending_props.clone();
-    //     let new_type = work_in_progress.borrow()._type.clone();
-    //     if !Object::is(&old_props, &new_props) || !Object::is(&old_type, &new_type) {
-    //         unsafe { DID_RECEIVE_UPDATE = true }
-    //     } else {
-    //         let has_scheduled_update_or_context =
-    //             check_scheduled_update_or_context(current.clone(), render_lane.clone());
-    //         // The current fiber lane is not included in render_lane
-    //         // TODO context
-    //         if !has_scheduled_update_or_context {
-    //             unsafe { DID_RECEIVE_UPDATE = false }
-    //             match work_in_progress.borrow().tag {
-    //                 WorkTag::ContextProvider => {
-    //                     let new_value = derive_from_js_value(
-    //                         &work_in_progress.borrow().memoized_props,
-    //                         "value",
-    //                     );
-    //                     let context =
-    //                         derive_from_js_value(&work_in_progress.borrow()._type, "_context");
-    //                     push_provider(&context, new_value);
-    //                 }
-    //                 _ => {}
-    //             }
-    //             return Ok(bailout_on_already_finished_work(
-    //                 work_in_progress,
-    //                 render_lane,
-    //             ));
-    //         }
-    //     }
-    // }
+    if current.is_some() {
+        let current = current.clone().unwrap();
+        let old_props = current.borrow().memoized_props.clone();
+        let old_type = current.borrow()._type.clone();
+        let new_props = work_in_progress.borrow().pending_props.clone();
+        let new_type = work_in_progress.borrow()._type.clone();
+        if !Object::is(&old_props, &new_props) || !Object::is(&old_type, &new_type) {
+            unsafe { DID_RECEIVE_UPDATE = true }
+        } else {
+            let has_scheduled_update_or_context =
+                check_scheduled_update_or_context(current.clone(), render_lane.clone());
+            // The current fiber lane is not included in render_lane
+            // TODO context
+            if !has_scheduled_update_or_context
+                && current.borrow().tag != WorkTag::SuspenseComponent
+            {
+                unsafe { DID_RECEIVE_UPDATE = false }
+                match work_in_progress.borrow().tag {
+                    WorkTag::ContextProvider => {
+                        let new_value = derive_from_js_value(
+                            &work_in_progress.borrow().memoized_props,
+                            "value",
+                        );
+                        let context =
+                            derive_from_js_value(&work_in_progress.borrow()._type, "_context");
+                        push_provider(&context, new_value);
+                    }
+                    _ => {}
+                }
+                return Ok(bailout_on_already_finished_work(
+                    work_in_progress,
+                    render_lane,
+                ));
+            }
+        }
+    }
 
     work_in_progress.borrow_mut().lanes = Lane::NoLane;
     // if current.is_some() {
@@ -117,7 +119,23 @@ pub fn begin_work(
         WorkTag::Fragment => Ok(update_fragment(work_in_progress.clone())),
         WorkTag::SuspenseComponent => Ok(update_suspense_component(work_in_progress.clone())),
         WorkTag::OffscreenComponent => Ok(update_offscreen_component(work_in_progress.clone())),
+        WorkTag::LazyComponent => update_lazy_component(work_in_progress.clone(), render_lane),
     };
+}
+
+fn update_lazy_component(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    render_lane: Lane,
+) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
+    let lazy_type = { work_in_progress.borrow()._type.clone() };
+    let payload = derive_from_js_value(&lazy_type, "_payload");
+    let init_jsvalue = derive_from_js_value(&lazy_type, "_init");
+    let init = init_jsvalue.dyn_ref::<Function>().unwrap();
+    let Component = init.call1(&JsValue::null(), &payload)?;
+    work_in_progress.borrow_mut()._type = Component.clone();
+    work_in_progress.borrow_mut().tag = WorkTag::FunctionComponent;
+    let child = update_function_component(work_in_progress, Component.clone(), render_lane);
+    child
 }
 
 fn mount_suspense_fallback_children(

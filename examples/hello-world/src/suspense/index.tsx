@@ -19,14 +19,21 @@ function fetchData(id, timeout) {
 
 export default function App() {
   return (
-    <Suspense fallback={<div>loading</div>}>
-      <Child />
+    <Suspense fallback={<div>Out loading</div>}>
+      <Child id={1} timeout={1000} />
+      <Suspense fallback={<div>Inner loading</div>}>
+        <Child id={2} timeout={2000} />
+      </Suspense>
     </Suspense>
   )
 }
 
-function Child() {
-  const {data} = use(fetchData(1, 1000))
+function Child({id, timeout}) {
+  const {data} = use(fetchData(id, timeout))
 
-  return <span>{data}</span>
+  return (
+    <div>
+      {id}:{data}
+    </div>
+  )
 }

@@ -5,6 +5,7 @@ use web_sys::wasm_bindgen::{JsCast, JsValue};
 pub static REACT_ELEMENT_TYPE: &str = "react.element";
 pub static REACT_CONTEXT_TYPE: &str = "react.context";
 pub static REACT_PROVIDER_TYPE: &str = "react.provider";
+pub static REACT_LAZY_TYPE: &str = "react.lazy";
 pub static REACT_MEMO_TYPE: &str = "react.memo";
 pub static REACT_SUSPENSE_TYPE: &str = "react.suspense";
 pub static REACT_FRAGMENT_TYPE: &str = "react.fragment";

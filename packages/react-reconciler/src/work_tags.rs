@@ -9,4 +9,5 @@ pub enum WorkTag {
     SuspenseComponent = 13,
     OffscreenComponent = 14,
     MemoComponent = 15,
+    LazyComponent = 16,
 }

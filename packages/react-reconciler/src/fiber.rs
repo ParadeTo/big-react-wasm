@@ -10,7 +10,8 @@ use wasm_bindgen::JsValue;
 use web_sys::js_sys::Reflect;
 
 use shared::{
-    derive_from_js_value, log, type_of, REACT_MEMO_TYPE, REACT_PROVIDER_TYPE, REACT_SUSPENSE_TYPE,
+    derive_from_js_value, log, type_of, REACT_LAZY_TYPE, REACT_MEMO_TYPE, REACT_PROVIDER_TYPE,
+    REACT_SUSPENSE_TYPE,
 };
 
 use crate::fiber_context::ContextItem;
@@ -179,6 +180,8 @@ impl FiberNode {
                 fiber_tag = WorkTag::ContextProvider;
             } else if _typeof == REACT_MEMO_TYPE {
                 fiber_tag = WorkTag::MemoComponent;
+            } else if _typeof == REACT_LAZY_TYPE {
+                fiber_tag = WorkTag::LazyComponent;
             } else {
                 log!("Unsupported type {:?}", _type);
             }

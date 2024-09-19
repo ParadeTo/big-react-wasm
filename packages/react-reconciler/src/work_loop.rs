@@ -9,7 +9,7 @@ use scheduler::{
     unstable_cancel_callback, unstable_schedule_callback_no_delay, unstable_should_yield_to_host,
     Priority,
 };
-use shared::{is_dev, log};
+use shared::{derive_from_js_value, is_dev, log, type_of};
 
 use crate::begin_work::begin_work;
 use crate::commit_work::{
@@ -42,7 +42,9 @@ static ROOT_COMPLETED: u8 = 2;
 static ROOT_DID_NOT_COMPLETE: u8 = 3;
 
 static NOT_SUSPENDED: u8 = 0;
-static SUSPENDED_ON_DATA: u8 = 6;
+static SUSPENDED_ON_ERROR: u8 = 1;
+static SUSPENDED_ON_DATA: u8 = 2;
+static SUSPENDED_ON_DEPRECATED_THROW_PROMISE: u8 = 4;
 
 pub fn schedule_update_on_fiber(fiber: Rc<RefCell<FiberNode>>, lane: Lane) {
     if is_dev() {
@@ -505,7 +507,16 @@ fn handle_throw(root: Rc<RefCell<FiberRootNode>>, mut thrown_value: JsValue) {
         unsafe { WORK_IN_PROGRESS_SUSPENDED_REASON = SUSPENDED_ON_DATA };
         thrown_value = get_suspense_thenable();
     } else {
-        // TODO
+        let is_wakeable = !thrown_value.is_null()
+            && type_of(&thrown_value, "object")
+            && derive_from_js_value(&thrown_value, "then").is_function();
+        unsafe {
+            WORK_IN_PROGRESS_SUSPENDED_REASON = if is_wakeable {
+                SUSPENDED_ON_DEPRECATED_THROW_PROMISE
+            } else {
+                SUSPENDED_ON_ERROR
+            };
+        };
     }
 
     unsafe {
@@ -520,7 +531,12 @@ fn throw_and_unwind_work_loop(
     lane: Lane,
 ) {
     reset_hooks_on_unwind(unit_of_work.clone());
-    throw_exception(root.clone(), thrown_value, lane.clone());
+    throw_exception(
+        root.clone(),
+        unit_of_work.clone(),
+        thrown_value,
+        lane.clone(),
+    );
     unwind_unit_of_work(unit_of_work);
 }
 
