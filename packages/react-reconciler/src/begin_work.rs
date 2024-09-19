@@ -119,7 +119,23 @@ pub fn begin_work(
         WorkTag::Fragment => Ok(update_fragment(work_in_progress.clone())),
         WorkTag::SuspenseComponent => Ok(update_suspense_component(work_in_progress.clone())),
         WorkTag::OffscreenComponent => Ok(update_offscreen_component(work_in_progress.clone())),
+        WorkTag::LazyComponent => update_lazy_component(work_in_progress.clone(), render_lane),
     };
+}
+
+fn update_lazy_component(
+    work_in_progress: Rc<RefCell<FiberNode>>,
+    render_lane: Lane,
+) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
+    let lazy_type = { work_in_progress.borrow()._type.clone() };
+    let payload = derive_from_js_value(&lazy_type, "_payload");
+    let init_jsvalue = derive_from_js_value(&lazy_type, "_init");
+    let init = init_jsvalue.dyn_ref::<Function>().unwrap();
+    let Component = init.call1(&JsValue::null(), &payload)?;
+    work_in_progress.borrow_mut()._type = Component.clone();
+    work_in_progress.borrow_mut().tag = WorkTag::FunctionComponent;
+    let child = update_function_component(work_in_progress, Component.clone(), render_lane);
+    child
 }
 
 fn mount_suspense_fallback_children(

@@ -1,1 +1,1 @@
-export {default} from './suspense'
+export {default} from './lazy'

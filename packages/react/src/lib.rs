@@ -1,14 +1,16 @@
-use js_sys::{Array, Object, Reflect, JSON};
+use js_sys::{Array, Function, Object, Reflect, JSON};
+use lazy::{lazy_initializer, UNINITIALIZED};
 use wasm_bindgen::prelude::*;
 
 use shared::{
-    derive_from_js_value, REACT_CONTEXT_TYPE, REACT_ELEMENT_TYPE, REACT_MEMO_TYPE,
+    derive_from_js_value, REACT_CONTEXT_TYPE, REACT_ELEMENT_TYPE, REACT_LAZY_TYPE, REACT_MEMO_TYPE,
     REACT_PROVIDER_TYPE,
 };
 
 use crate::current_dispatcher::CURRENT_DISPATCHER;
 
 pub mod current_dispatcher;
+mod lazy;
 
 fn resolve_key(val: &JsValue) -> JsValue {
     if val.is_undefined() {
@@ -198,4 +200,27 @@ pub fn memo(_type: &JsValue, compare: &JsValue) -> JsValue {
         },
     );
     fiber_type.into()
+}
+
+#[wasm_bindgen]
+pub fn lazy(ctor: &JsValue) -> JsValue {
+    let payload = Object::new();
+    Reflect::set(&payload, &"_status".into(), &JsValue::from(UNINITIALIZED));
+    Reflect::set(&payload, &"_result".into(), ctor);
+
+    let lazy_type = Object::new();
+
+    Reflect::set(
+        &lazy_type,
+        &"$$typeof".into(),
+        &JsValue::from_str(REACT_LAZY_TYPE),
+    );
+    Reflect::set(&lazy_type, &"_payload".into(), &payload);
+    let closure = Closure::wrap(
+        Box::new(lazy_initializer) as Box<dyn Fn(JsValue) -> Result<JsValue, JsValue>>
+    );
+    let f = closure.as_ref().unchecked_ref::<Function>().clone();
+    closure.forget();
+    Reflect::set(&lazy_type, &"_init".into(), &f);
+    lazy_type.into()
 }
