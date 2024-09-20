@@ -55,3 +55,7 @@
 [从零实现 React v18，但 WASM 版 - [23] 实现 Fragment](https://www.paradeto.com/2024/08/01/big-react-wasm-23/)
 
 [从零实现 React v18，但 WASM 版 - [24] 实现 Suspense（一）：渲染 Fallback](https://www.paradeto.com/2024/08/01/big-react-wasm-24/)
+
+[从零实现 React v18，但 WASM 版 - [25] 实现 Suspense（二）：结合 use hooks 获取数据](https://www.paradeto.com/2024/08/01/big-react-wasm-25/)
+
+[从零实现 React v18，但 WASM 版 - [26] 实现 React.lazy](https://www.paradeto.com/2024/08/01/big-react-wasm-26/)
