@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use react::current_batch_config::REACT_CURRENT_BATCH_CONFIG;
 use scheduler::{unstable_get_current_priority_level, Priority};
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
@@ -13,6 +14,7 @@ bitflags! {
         const SyncLane =            0b0000000000000000000000000000001; // onClick
         const InputContinuousLane = 0b0000000000000000000000000000010; // Continuous Trigger, example: onScroll
         const DefaultLane =         0b0000000000000000000000000000100; // useEffect
+        const TransitionLane =      0b0000000000000000000000000001000;
         const IdleLane =            0b1000000000000000000000000000000;
     }
 }
@@ -46,6 +48,10 @@ pub fn is_subset_of_lanes(set: Lane, subset: Lane) -> bool {
 }
 
 pub fn request_update_lane() -> Lane {
+    let is_transition = unsafe { REACT_CURRENT_BATCH_CONFIG.transition } != 0;
+    if is_transition {
+        return Lane::TransitionLane;
+    }
     let current_scheduler_priority_level = unstable_get_current_priority_level();
     let update_lane = scheduler_priority_to_lane(current_scheduler_priority_level);
     update_lane

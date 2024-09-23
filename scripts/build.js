@@ -72,17 +72,22 @@ const reactDomIndexBgData = fs.readFileSync(reactDomIndexFilename)
 fs.writeFileSync(reactDomIndexFilename, code1 + reactDomIndexBgData)
 
 // add Suspense + Fragment
-const reactIndexFilename = `${cwd}/dist/react/index.js`
-const reactIndexData = fs.readFileSync(reactIndexFilename)
-fs.writeFileSync(
-  reactIndexFilename,
-  reactIndexData +
-    `export const Suspense='react.suspense';\nexport const Fragment='react.fragment';\n`
-)
-const reactTsIndexFilename = `${cwd}/dist/react/index.d.ts`
-const reactTsIndexData = fs.readFileSync(reactTsIndexFilename)
-fs.writeFileSync(
-  reactTsIndexFilename,
-  reactTsIndexData +
-    `export const Suspense: string;\nexport const Fragment: string;\n`
-)
+;[
+  {filename: 'index.js', tsFilename: 'index.d.ts'},
+  {filename: 'jsx-dev-runtime.js', tsFilename: 'jsx-dev-runtime.d.ts'},
+].forEach(({filename, tsFilename}) => {
+  const reactIndexFilename = `${cwd}/dist/react/${filename}`
+  const reactIndexData = fs.readFileSync(reactIndexFilename)
+  fs.writeFileSync(
+    reactIndexFilename,
+    reactIndexData +
+      `export const Suspense='react.suspense';\nexport const Fragment='react.fragment';\n`
+  )
+  const reactTsIndexFilename = `${cwd}/dist/react/${tsFilename}`
+  const reactTsIndexData = fs.readFileSync(reactTsIndexFilename)
+  fs.writeFileSync(
+    reactTsIndexFilename,
+    reactTsIndexData +
+      `export const Suspense: string;\nexport const Fragment: string;\n`
+  )
+})

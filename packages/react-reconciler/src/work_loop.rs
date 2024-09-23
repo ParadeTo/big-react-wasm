@@ -142,6 +142,9 @@ pub fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
                 .schedule_microtask(Box::new(|| flush_sync_callbacks()));
         }
     } else {
+        if is_dev() {
+            log!("Schedule in macrotask, priority {:?}", update_lanes);
+        }
         let scheduler_priority = lanes_to_scheduler_priority(cur_priority.clone());
         let closure = Closure::wrap(Box::new(move |did_timeout_js_value: JsValue| {
             let did_timeout = did_timeout_js_value.as_bool().unwrap();

@@ -10,6 +10,7 @@ pub struct Dispatcher {
     pub use_memo: Function,
     pub use_callback: Function,
     pub use_context: Function,
+    pub use_transition: Function,
     pub _use: Function,
 }
 
@@ -23,6 +24,7 @@ impl Dispatcher {
         use_memo: Function,
         use_callback: Function,
         use_context: Function,
+        use_transition: Function,
         _use: Function,
     ) -> Self {
         Dispatcher {
@@ -32,6 +34,7 @@ impl Dispatcher {
             use_memo,
             use_callback,
             use_context,
+            use_transition,
             _use,
         }
     }
@@ -58,6 +61,7 @@ pub unsafe fn update_dispatcher(args: &JsValue) {
     let use_memo = derive_function_from_js_value(args, "use_memo");
     let use_callback = derive_function_from_js_value(args, "use_callback");
     let use_context = derive_function_from_js_value(args, "use_context");
+    let use_transition = derive_function_from_js_value(args, "use_transition");
     let _use = derive_function_from_js_value(args, "use");
     CURRENT_DISPATCHER.current = Some(Box::new(Dispatcher::new(
         use_state,
@@ -66,6 +70,7 @@ pub unsafe fn update_dispatcher(args: &JsValue) {
         use_memo,
         use_callback,
         use_context,
+        use_transition,
         _use,
     )))
 }

@@ -1,1 +1,1 @@
-export {default} from './lazy'
+export {default} from './useTransition'
