@@ -115,7 +115,7 @@ impl Debug for FiberNode {
                     self.flags,
                     self.subtree_flags,
                     self.lanes,
-                    self.child_lanes
+                    self.child_lanes,
                 )
                 .expect("print error");
             }
@@ -299,7 +299,7 @@ pub struct FiberRootNode {
     pub finished_lanes: Lane,
     pub suspended_lanes: Lane,
     pub pinged_lanes: Lane, // Records the processed suspended lanes, comes from suspended lanes
-    pub callback_node: Option<Task>,
+    pub callback_node: Option<Rc<RefCell<Task>>>,
     pub callback_priority: Lane,
     pub pending_passive_effects: Rc<RefCell<PendingPassiveEffects>>,
     pub ping_cache: Option<HashMap<JsValueKey, Rc<RefCell<HashSet<Lane>>>>>,

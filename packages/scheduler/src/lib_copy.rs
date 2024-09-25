@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::cmp::{Ordering, PartialEq};
-use std::rc::Rc;
 
 use shared::log;
 use wasm_bindgen::prelude::*;
@@ -13,8 +11,8 @@ mod heap;
 
 static FRAME_YIELD_MS: f64 = 5.0;
 static mut TASK_ID_COUNTER: u32 = 1;
-static mut TASK_QUEUE: Vec<Rc<RefCell<Task>>> = vec![];
-static mut TIMER_QUEUE: Vec<Rc<RefCell<Task>>> = vec![];
+static mut TASK_QUEUE: Vec<Task> = vec![];
+static mut TIMER_QUEUE: Vec<Task> = vec![];
 static mut IS_HOST_TIMEOUT_SCHEDULED: bool = false;
 static mut IS_HOST_CALLBACK_SCHEDULED: bool = false;
 static mut IS_PERFORMING_WORK: bool = false;
@@ -25,7 +23,7 @@ static mut MESSAGE_CHANNEL: Option<MessageChannel> = None;
 // static mut MESSAGE_CHANNEL_LISTENED: bool = false;
 static mut START_TIME: f64 = -1.0;
 static mut CURRENT_PRIORITY_LEVEL: Priority = Priority::NormalPriority;
-static mut CURRENT_TASK: Option<&Rc<RefCell<Task>>> = None;
+static mut CURRENT_TASK: Option<&Task> = None;
 static mut PORT1: Option<MessagePort> = None;
 static mut PORT2: Option<MessagePort> = None;
 
@@ -245,20 +243,19 @@ fn main() {
  */
 fn advance_timers(current_time: f64) {
     unsafe {
-        let mut timer = peek(&TIMER_QUEUE);
+        let mut timer = peek_mut(&mut TIMER_QUEUE);
         while timer.is_some() {
             let task = timer.unwrap();
-            if task.borrow().callback.is_null() {
+            if task.callback.is_null() {
                 pop(&mut TIMER_QUEUE);
-            } else if task.borrow().start_time <= current_time {
+            } else if task.start_time <= current_time {
                 let t = pop(&mut TIMER_QUEUE);
-                let expiration_time = { task.borrow().expiration_time };
-                task.borrow_mut().sort_index = expiration_time;
+                task.sort_index = task.expiration_time;
                 push(&mut TASK_QUEUE, task.clone());
             } else {
                 return;
             }
-            timer = peek(&mut TIMER_QUEUE);
+            timer = peek_mut(&mut TIMER_QUEUE);
         }
     }
 }
@@ -310,36 +307,35 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValu
     unsafe {
         let mut current_time = initial_time;
         advance_timers(current_time);
-        // let mut current_task = peek_mut(&mut TASK_QUEUE);
+        let mut current_task = peek_mut(&mut TASK_QUEUE);
 
-        CURRENT_TASK = peek(&TASK_QUEUE);
-        while CURRENT_TASK.is_some() {
-            let t = CURRENT_TASK.unwrap();
+        CURRENT_TASK = peek(&mut TASK_QUEUE);
+        while current_task.is_some() {
+            let mut t = current_task.unwrap();
 
-            if t.borrow().expiration_time > current_time
+            if t.expiration_time > current_time
                 && (!has_time_remaining || unstable_should_yield_to_host())
             {
                 break;
             }
 
-            let callback = t.borrow().callback.clone();
-            log!("-----task {:?}", t);
+            let callback = t.callback.clone();
             if callback.is_function() {
-                t.borrow_mut().callback = JsValue::null();
-                CURRENT_PRIORITY_LEVEL = t.borrow().priority_level.clone();
-                let did_user_callback_timeout = t.borrow().expiration_time <= current_time;
+                t.callback = JsValue::null();
+                CURRENT_PRIORITY_LEVEL = t.priority_level.clone();
+                let did_user_callback_timeout = t.expiration_time <= current_time;
                 let continuation_callback = callback
                     .dyn_ref::<Function>()
                     .unwrap()
                     .call1(&JsValue::null(), &JsValue::from(did_user_callback_timeout))?;
                 current_time = unstable_now();
-                log!("continuation_callback {:?}", continuation_callback);
+
                 if continuation_callback.is_function() {
-                    t.borrow_mut().callback = continuation_callback;
+                    t.callback = continuation_callback;
                 } else {
                     if match peek(&TASK_QUEUE) {
                         None => false,
-                        Some(task) => task.borrow().id == t.borrow().id,
+                        Some(task) => task == t,
                     } {
                         pop(&mut TASK_QUEUE);
                     }
@@ -347,11 +343,10 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValu
 
                 advance_timers(current_time);
             } else {
-                log!("==========================TASK_QUEUE1 {:?}", TASK_QUEUE);
                 pop(&mut TASK_QUEUE);
-                log!("==========================TASK_QUEUE2 {:?}", TASK_QUEUE);
             }
 
+            current_task = peek_mut(&mut TASK_QUEUE);
             CURRENT_TASK = peek(&TASK_QUEUE);
         }
 
@@ -362,7 +357,7 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValu
             if first_timer.is_some() {
                 let task = first_timer.unwrap();
 
-                request_host_timeout(handle_timeout, task.borrow().start_time - current_time);
+                request_host_timeout(handle_timeout, task.start_time - current_time);
             }
 
             return Ok(false);
@@ -395,7 +390,7 @@ fn handle_timeout(current_time: f64) {
                     let first_timer_task = first_timer.unwrap();
                     request_host_timeout(
                         handle_timeout,
-                        first_timer_task.borrow().start_time - current_time,
+                        first_timer_task.start_time - current_time,
                     );
                 }
             }
@@ -414,20 +409,18 @@ fn request_host_timeout(callback: fn(f64), ms: f64) {
     }
 }
 
-pub fn unstable_cancel_callback(t: Rc<RefCell<Task>>) {
-    let id = t.borrow().id;
-
+pub fn unstable_cancel_callback(task: Task) {
+    let id = task.id;
     unsafe {
-        for task in &TASK_QUEUE {
-            if task.borrow().id == id {
-                task.borrow_mut().callback = JsValue::null();
-                log!("TASK_QUEUE {:?}", TASK_QUEUE.clone());
+        for mut task in &mut TASK_QUEUE {
+            if task.id == id {
+                task.callback = JsValue::null();
             }
         }
 
-        for task in &TIMER_QUEUE {
-            if task.borrow().id == id {
-                task.borrow_mut().callback = JsValue::null();
+        for mut task in &mut TIMER_QUEUE {
+            if task.id == id {
+                task.callback = JsValue::null();
             }
         }
     }
@@ -437,7 +430,7 @@ pub fn unstable_schedule_callback(
     priority_level: Priority,
     callback: Function,
     delay: f64,
-) -> Rc<RefCell<Task>> {
+) -> Task {
     let current_time = unstable_now();
     let mut start_time = current_time;
 
@@ -447,16 +440,16 @@ pub fn unstable_schedule_callback(
 
     let timeout = get_priority_timeout(priority_level.clone());
     let expiration_time = start_time + timeout;
-    let mut new_task = Rc::new(RefCell::new(Task::new(
+    let mut new_task = Task::new(
         callback,
         priority_level.clone(),
         start_time,
         expiration_time,
-    )));
+    );
     let cloned = new_task.clone();
     unsafe {
         if start_time > current_time {
-            new_task.borrow_mut().sort_index = start_time;
+            new_task.sort_index = start_time;
             push(&mut TIMER_QUEUE, new_task.clone());
 
             if peek(&mut TASK_QUEUE).is_none() {
@@ -472,7 +465,7 @@ pub fn unstable_schedule_callback(
                 }
             }
         } else {
-            new_task.borrow_mut().sort_index = expiration_time;
+            new_task.sort_index = expiration_time;
             push(&mut TASK_QUEUE, new_task);
 
             if !IS_HOST_CALLBACK_SCHEDULED && !IS_PERFORMING_WORK {
@@ -485,10 +478,7 @@ pub fn unstable_schedule_callback(
     cloned
 }
 
-pub fn unstable_schedule_callback_no_delay(
-    priority_level: Priority,
-    callback: Function,
-) -> Rc<RefCell<Task>> {
+pub fn unstable_schedule_callback_no_delay(priority_level: Priority, callback: Function) -> Task {
     unstable_schedule_callback(priority_level, callback, 0.0)
 }
 

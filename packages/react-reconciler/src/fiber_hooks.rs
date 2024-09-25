@@ -279,10 +279,16 @@ fn update_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
                     .clone();
 
                 match current {
-                    None => None,
+                    None => {
+                        log!("1");
+                        None
+                    }
                     Some(current) => match current.clone().borrow().memoized_state.clone() {
                         Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
-                        _ => None,
+                        _ => {
+                            log!("2");
+                            None
+                        }
                     },
                 }
             }
@@ -293,13 +299,23 @@ fn update_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
             None => match CURRENTLY_RENDERING_FIBER.clone() {
                 Some(current) => match current.clone().borrow().memoized_state.clone() {
                     Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
-                    _ => None,
+                    _ => {
+                        log!("3");
+                        None
+                    }
                 },
-                _ => None,
+                _ => {
+                    log!("4");
+                    None
+                }
             },
             Some(work_in_progress_hook) => work_in_progress_hook.clone().borrow().next.clone(),
         };
-
+        log!(
+            "next_current_hook {:?} {:?}",
+            next_current_hook,
+            next_work_in_progress_hook
+        );
         if next_work_in_progress_hook.is_some() {
             WORK_IN_PROGRESS_HOOK = next_work_in_progress_hook.clone();
             CURRENT_HOOK = next_current_hook.clone();
@@ -619,7 +635,6 @@ fn update_effect(create: Function, deps: JsValue) {
             .unwrap()
             .borrow_mut()
             .flags |= Flags::PassiveEffect;
-        log!("CURRENTLY_RENDERING_FIBER.as_ref().unwrap().borrow_mut()");
 
         hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
             Some(MemoizedState::Effect(push_effect(
@@ -803,7 +818,7 @@ fn mount_transition() -> Vec<JsValue> {
     closure.forget();
     hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
         Some(MemoizedState::MemoizedJsValue(start.clone().into()));
-
+    log!("mount_transition");
     vec![JsValue::from_bool(is_pending), start.into()]
 }
 
@@ -830,7 +845,7 @@ fn start_transition(set_pending: Function, callback: Function) {
     let prev_transition = unsafe { REACT_CURRENT_BATCH_CONFIG.transition };
 
     // low priority
-    unsafe { REACT_CURRENT_BATCH_CONFIG.transition = 1 };
+    unsafe { REACT_CURRENT_BATCH_CONFIG.transition = Lane::TransitionLane.bits() };
     callback.call0(&JsValue::null());
     set_pending.call1(&JsValue::null(), &JsValue::from_bool(false));
 

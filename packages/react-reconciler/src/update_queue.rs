@@ -82,6 +82,7 @@ pub fn create_update_queue() -> Rc<RefCell<UpdateQueue>> {
     }))
 }
 
+#[derive(Debug)]
 pub struct ReturnOfProcessUpdateQueue {
     pub memoized_state: Option<MemoizedState>,
     pub base_state: Option<MemoizedState>,
@@ -239,6 +240,6 @@ pub fn process_update_queue(
         result.base_state = new_base_state;
         result.base_queue = new_base_queue_last.clone();
     }
-
+    log!("tab result {:?}", result);
     result
 }

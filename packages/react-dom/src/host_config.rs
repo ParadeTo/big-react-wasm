@@ -88,15 +88,15 @@ impl HostConfig for ReactDomHostConfig {
         let c = child.clone().downcast::<Node>().unwrap();
         match p.append_child(&c) {
             Ok(_) => {
-                log!(
-                    "append_initial_child {:?} {:?}",
-                    p,
-                    if c.first_child().is_some() {
-                        c.first_child().clone().unwrap().text_content()
-                    } else {
-                        c.text_content()
-                    }
-                );
+                // log!(
+                //     "append_initial_child {:?} {:?}",
+                //     p,
+                //     if c.first_child().is_some() {
+                //         c.first_child().clone().unwrap().text_content()
+                //     } else {
+                //         c.text_content()
+                //     }
+                // );
             }
             Err(_) => {
                 log!("Failed to append_initial_child {:?} {:?}", p, c);
@@ -113,7 +113,7 @@ impl HostConfig for ReactDomHostConfig {
         let c = child.clone().downcast::<Node>().unwrap();
         match p.remove_child(&c) {
             Ok(_) => {
-                log!("remove_child {:?} {:?}", p, c);
+                // log!("remove_child {:?} {:?}", p, c);
             }
             Err(e) => {
                 log!("Failed to remove_child {:?} {:?} {:?} ", e, p, c);
@@ -132,20 +132,20 @@ impl HostConfig for ReactDomHostConfig {
         let child = child.clone().downcast::<Node>().unwrap();
         match parent.insert_before(&child, Some(&before)) {
             Ok(_) => {
-                log!(
-                    "insert_child_to_container {:?} {:?} {:?}",
-                    parent,
-                    if before.first_child().is_some() {
-                        before.first_child().clone().unwrap().text_content()
-                    } else {
-                        before.text_content()
-                    },
-                    if child.first_child().is_some() {
-                        child.first_child().clone().unwrap().text_content()
-                    } else {
-                        child.text_content()
-                    }
-                );
+                // log!(
+                //     "insert_child_to_container {:?} {:?} {:?}",
+                //     parent,
+                //     if before.first_child().is_some() {
+                //         before.first_child().clone().unwrap().text_content()
+                //     } else {
+                //         before.text_content()
+                //     },
+                //     if child.first_child().is_some() {
+                //         child.first_child().clone().unwrap().text_content()
+                //     } else {
+                //         child.text_content()
+                //     }
+                // );
             }
             Err(_) => {
                 log!(

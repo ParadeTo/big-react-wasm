@@ -123,6 +123,7 @@ pub fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
     }
 
     if existing_callback.is_some() {
+        log!("unstable_cancel_callback {:?}", existing_callback);
         unstable_cancel_callback(existing_callback.unwrap())
     }
 
@@ -147,6 +148,7 @@ pub fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
         }
         let scheduler_priority = lanes_to_scheduler_priority(cur_priority.clone());
         let closure = Closure::wrap(Box::new(move |did_timeout_js_value: JsValue| {
+            log!("did_timeout_js_value1 {:?}", did_timeout_js_value);
             let did_timeout = did_timeout_js_value.as_bool().unwrap();
             perform_concurrent_work_on_root(root_cloned.clone(), did_timeout)
         }) as Box<dyn Fn(JsValue) -> JsValue>);
@@ -175,6 +177,11 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane, should_time_slice: 
     }
 
     if unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE != lane } {
+        log!(
+            "WORK_IN_PROGRESS_ROOT_RENDER_LANE {:?} {:?}",
+            unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE.clone() },
+            lane
+        );
         prepare_fresh_stack(root.clone(), lane.clone());
     }
 
@@ -213,11 +220,11 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane, should_time_slice: 
     }
 
     log!("render over {:?}", *root.clone().borrow());
-    // log!("render over {:?}", unsafe { WORK_IN_PROGRESS.clone() });
-    // log!("render over");
+
+    // log!("WORK_IN_PROGRESS {:?}", unsafe { WORK_IN_PROGRESS.clone() });
 
     unsafe {
-        WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane;
+        // WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane;
 
         if should_time_slice && WORK_IN_PROGRESS.is_some() {
             return ROOT_INCOMPLETE;
@@ -256,7 +263,9 @@ fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout
 
     ensure_root_is_scheduled(root.clone());
     if exit_status == ROOT_INCOMPLETE {
-        if root.borrow().callback_node.as_ref().unwrap().id != cur_callback_node.unwrap().id {
+        if root.borrow().callback_node.clone().unwrap().borrow().id
+            != cur_callback_node.unwrap().borrow().id
+        {
             // 调度了更高优更新，这个更新已经被取消了
             return JsValue::undefined();
         }
@@ -282,7 +291,7 @@ fn perform_concurrent_work_on_root(root: Rc<RefCell<FiberRootNode>>, did_timeout
         };
         root.clone().borrow_mut().finished_work = finished_work;
         root.clone().borrow_mut().finished_lanes = lanes;
-
+        unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane };
         commit_root(root);
     } else {
         todo!("Unsupported status of concurrent render")
@@ -316,7 +325,7 @@ fn perform_sync_work_on_root(root: Rc<RefCell<FiberRootNode>>, lanes: Lane) {
         unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane };
         commit_root(root);
     } else if exit_status == ROOT_DID_NOT_COMPLETE {
-        unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane };
+        // unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane };
         mark_root_suspended(root.clone(), next_lane);
         ensure_root_is_scheduled(root.clone());
     } else {
@@ -439,7 +448,6 @@ fn work_loop_sync() -> Result<(), JsValue> {
 fn work_loop_concurrent() -> Result<(), JsValue> {
     unsafe {
         while WORK_IN_PROGRESS.is_some() && !unstable_should_yield_to_host() {
-            log!("work_loop_concurrent");
             perform_unit_of_work(WORK_IN_PROGRESS.clone().unwrap())?;
         }
     }
