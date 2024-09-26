@@ -311,11 +311,7 @@ fn update_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
             },
             Some(work_in_progress_hook) => work_in_progress_hook.clone().borrow().next.clone(),
         };
-        log!(
-            "next_current_hook {:?} {:?}",
-            next_current_hook,
-            next_work_in_progress_hook
-        );
+
         if next_work_in_progress_hook.is_some() {
             WORK_IN_PROGRESS_HOOK = next_work_in_progress_hook.clone();
             CURRENT_HOOK = next_current_hook.clone();

@@ -215,13 +215,14 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane, should_time_slice: 
             Ok(_) => {
                 break;
             }
-            Err(e) => handle_throw(root.clone(), e),
+            Err(e) => {
+                log!("e {:?}", e);
+                handle_throw(root.clone(), e)
+            }
         };
     }
 
     log!("render over {:?}", *root.clone().borrow());
-
-    // log!("WORK_IN_PROGRESS {:?}", unsafe { WORK_IN_PROGRESS.clone() });
 
     unsafe {
         // WORK_IN_PROGRESS_ROOT_RENDER_LANE = Lane::NoLane;
