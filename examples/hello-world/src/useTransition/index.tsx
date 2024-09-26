@@ -6,7 +6,7 @@ import ContactTab from './ContactTab'
 export default function App() {
   const [isPending, startTransition] = useTransition()
   const [tab, setTab] = useState('about')
-  console.log('tab', tab)
+
   function selectTab(nextTab) {
     startTransition(() => {
       setTab(nextTab)
@@ -27,7 +27,6 @@ export default function App() {
         联系我
       </TabButton>
       <hr />
-      {isPending && 'loading'}
       {tab === 'about' && <AboutTab />}
       {tab === 'posts' && <PostsTab />}
       {tab === 'contact' && <ContactTab />}

@@ -279,16 +279,10 @@ fn update_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
                     .clone();
 
                 match current {
-                    None => {
-                        log!("1");
-                        None
-                    }
+                    None => None,
                     Some(current) => match current.clone().borrow().memoized_state.clone() {
                         Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
-                        _ => {
-                            log!("2");
-                            None
-                        }
+                        _ => None,
                     },
                 }
             }
@@ -299,15 +293,9 @@ fn update_work_in_progress_hook() -> Option<Rc<RefCell<Hook>>> {
             None => match CURRENTLY_RENDERING_FIBER.clone() {
                 Some(current) => match current.clone().borrow().memoized_state.clone() {
                     Some(MemoizedState::Hook(memoized_state)) => Some(memoized_state.clone()),
-                    _ => {
-                        log!("3");
-                        None
-                    }
+                    _ => None,
                 },
-                _ => {
-                    log!("4");
-                    None
-                }
+                _ => None,
             },
             Some(work_in_progress_hook) => work_in_progress_hook.clone().borrow().next.clone(),
         };
@@ -814,7 +802,6 @@ fn mount_transition() -> Vec<JsValue> {
     closure.forget();
     hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
         Some(MemoizedState::MemoizedJsValue(start.clone().into()));
-    log!("mount_transition");
     vec![JsValue::from_bool(is_pending), start.into()]
 }
 

@@ -323,7 +323,6 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValu
             }
 
             let callback = t.borrow().callback.clone();
-            log!("-----task {:?}", t);
             if callback.is_function() {
                 t.borrow_mut().callback = JsValue::null();
                 CURRENT_PRIORITY_LEVEL = t.borrow().priority_level.clone();
@@ -333,7 +332,6 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValu
                     .unwrap()
                     .call1(&JsValue::null(), &JsValue::from(did_user_callback_timeout))?;
                 current_time = unstable_now();
-                log!("continuation_callback {:?}", continuation_callback);
                 if continuation_callback.is_function() {
                     t.borrow_mut().callback = continuation_callback;
                 } else {
@@ -347,9 +345,7 @@ fn work_loop(has_time_remaining: bool, initial_time: f64) -> Result<bool, JsValu
 
                 advance_timers(current_time);
             } else {
-                log!("==========================TASK_QUEUE1 {:?}", TASK_QUEUE);
                 pop(&mut TASK_QUEUE);
-                log!("==========================TASK_QUEUE2 {:?}", TASK_QUEUE);
             }
 
             CURRENT_TASK = peek(&TASK_QUEUE);
@@ -421,7 +417,6 @@ pub fn unstable_cancel_callback(t: Rc<RefCell<Task>>) {
         for task in &TASK_QUEUE {
             if task.borrow().id == id {
                 task.borrow_mut().callback = JsValue::null();
-                log!("TASK_QUEUE {:?}", TASK_QUEUE.clone());
             }
         }
 

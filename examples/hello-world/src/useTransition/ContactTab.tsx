@@ -3,8 +3,8 @@ export default function ContactTab() {
     <>
       <p>Contact：</p>
       <ul>
-        <li>B Site：ayou</li>
-        <li>Wechat：ayou</li>
+        <li>E-mail：ayou@xx.com</li>
+        <li>Wechat：a22you</li>
       </ul>
     </>
   )

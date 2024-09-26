@@ -123,7 +123,6 @@ pub fn ensure_root_is_scheduled(root: Rc<RefCell<FiberRootNode>>) {
     }
 
     if existing_callback.is_some() {
-        log!("unstable_cancel_callback {:?}", existing_callback);
         unstable_cancel_callback(existing_callback.unwrap())
     }
 
@@ -177,11 +176,6 @@ fn render_root(root: Rc<RefCell<FiberRootNode>>, lane: Lane, should_time_slice: 
     }
 
     if unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE != lane } {
-        log!(
-            "WORK_IN_PROGRESS_ROOT_RENDER_LANE {:?} {:?}",
-            unsafe { WORK_IN_PROGRESS_ROOT_RENDER_LANE.clone() },
-            lane
-        );
         prepare_fresh_stack(root.clone(), lane.clone());
     }
 
