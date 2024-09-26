@@ -1,10 +1,10 @@
 export default function ContactTab() {
   return (
     <>
-      <p>Contact：</p>
+      <p>You can find me online here:</p>
       <ul>
-        <li>E-mail：ayou@xx.com</li>
-        <li>Wechat：a22you</li>
+        <li>admin@mysite.com</li>
+        <li>+123456789</li>
       </ul>
     </>
   )

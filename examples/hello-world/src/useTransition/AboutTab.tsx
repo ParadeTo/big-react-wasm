@@ -1,3 +1,3 @@
 export default function AboutTab() {
-  return <p>It's me, ayou.</p>
+  return <p>Welcome to my profile!</p>
 }

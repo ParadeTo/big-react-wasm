@@ -1,9 +1,11 @@
 import {useState, useTransition} from 'react'
-import TabButton from './TabButton'
-import AboutTab from './AboutTab'
-import PostsTab from './PostsTab'
-import ContactTab from './ContactTab'
-export default function App() {
+import TabButton from './TabButton.js'
+import AboutTab from './AboutTab.js'
+import PostsTab from './PostsTab.js'
+import ContactTab from './ContactTab.js'
+import './style.css'
+
+export default function TabContainer() {
   const [isPending, startTransition] = useTransition()
   const [tab, setTab] = useState('about')
 
@@ -16,15 +18,15 @@ export default function App() {
   return (
     <div>
       <TabButton isActive={tab === 'about'} onClick={() => selectTab('about')}>
-        首页
+        About
       </TabButton>
       <TabButton isActive={tab === 'posts'} onClick={() => selectTab('posts')}>
-        博客 (render慢)
+        Posts (slow)
       </TabButton>
       <TabButton
         isActive={tab === 'contact'}
         onClick={() => selectTab('contact')}>
-        联系我
+        Contact
       </TabButton>
       <hr />
       {tab === 'about' && <AboutTab />}
