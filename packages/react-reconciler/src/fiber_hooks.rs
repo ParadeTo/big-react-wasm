@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use react::current_batch_config::REACT_CURRENT_BATCH_CONFIG;
 use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::{Array, Function, Object, Reflect};
@@ -157,6 +158,18 @@ fn update_hooks_to_dispatcher(is_update: bool) {
         .clone();
     use_context_closure.forget();
 
+    // use_transition
+    let use_transition_closure = Closure::wrap(Box::new(if is_update {
+        update_transition
+    } else {
+        mount_transition
+    }) as Box<dyn Fn() -> Vec<JsValue>>);
+    let use_transition = use_transition_closure
+        .as_ref()
+        .unchecked_ref::<Function>()
+        .clone();
+    use_transition_closure.forget();
+
     // use
     let use_closure =
         Closure::wrap(Box::new(_use) as Box<dyn Fn(JsValue) -> Result<JsValue, JsValue>>);
@@ -171,6 +184,8 @@ fn update_hooks_to_dispatcher(is_update: bool) {
         .expect("TODO: panic set use_callback");
     Reflect::set(&object, &"use_context".into(), &use_context)
         .expect("TODO: panic set use_context");
+    Reflect::set(&object, &"use_transition".into(), &use_transition)
+        .expect("TODO: panic set use_transition");
     Reflect::set(&object, &"use".into(), &use_fn).expect("TODO: panic set use");
 
     updateDispatcher(&object.into());
@@ -604,7 +619,6 @@ fn update_effect(create: Function, deps: JsValue) {
             .unwrap()
             .borrow_mut()
             .flags |= Flags::PassiveEffect;
-        log!("CURRENTLY_RENDERING_FIBER.as_ref().unwrap().borrow_mut()");
 
         hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
             Some(MemoizedState::Effect(push_effect(
@@ -773,4 +787,50 @@ pub fn reset_hooks_on_unwind(wip: Rc<RefCell<FiberNode>>) {
         CURRENT_HOOK = None;
         WORK_IN_PROGRESS_HOOK = None;
     }
+}
+
+fn mount_transition() -> Vec<JsValue> {
+    let result = mount_state(&JsValue::from(false)).unwrap();
+    let is_pending = result[0].as_bool().unwrap();
+    let set_pending = result[1].clone().dyn_into::<Function>().unwrap();
+    let hook = mount_work_in_progress_hook();
+    let set_pending_cloned = set_pending.clone();
+    let closure = Closure::wrap(Box::new(move |callback: Function| {
+        start_transition(set_pending_cloned.clone(), callback);
+    }) as Box<dyn Fn(Function)>);
+    let start: Function = closure.as_ref().unchecked_ref::<Function>().clone();
+    closure.forget();
+    hook.as_ref().unwrap().clone().borrow_mut().memoized_state =
+        Some(MemoizedState::MemoizedJsValue(start.clone().into()));
+    vec![JsValue::from_bool(is_pending), start.into()]
+}
+
+fn update_transition() -> Vec<JsValue> {
+    let result = update_state(&JsValue::undefined()).unwrap();
+    let is_pending = result[0].as_bool().unwrap();
+    let hook = update_work_in_progress_hook();
+    if let MemoizedState::MemoizedJsValue(start) = hook
+        .as_ref()
+        .unwrap()
+        .clone()
+        .borrow()
+        .memoized_state
+        .as_ref()
+        .unwrap()
+    {
+        return vec![JsValue::from_bool(is_pending), start.into()];
+    }
+    panic!("update_transition")
+}
+
+fn start_transition(set_pending: Function, callback: Function) {
+    set_pending.call1(&JsValue::null(), &JsValue::from_bool(true));
+    let prev_transition = unsafe { REACT_CURRENT_BATCH_CONFIG.transition };
+
+    // low priority
+    unsafe { REACT_CURRENT_BATCH_CONFIG.transition = Lane::TransitionLane.bits() };
+    callback.call0(&JsValue::null());
+    set_pending.call1(&JsValue::null(), &JsValue::from_bool(false));
+
+    unsafe { REACT_CURRENT_BATCH_CONFIG.transition = prev_transition };
 }

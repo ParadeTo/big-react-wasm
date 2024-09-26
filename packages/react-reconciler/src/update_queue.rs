@@ -1,25 +1,31 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use shared::log;
+use std::fmt::{write, Debug, Formatter};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys::Function;
 
-use shared::log;
-
 use crate::fiber::{FiberNode, MemoizedState};
-use crate::fiber_hooks::{basic_state_reducer, Effect};
+use crate::fiber_hooks::Effect;
 use crate::fiber_lanes::{is_subset_of_lanes, merge_lanes, Lane};
 
 #[derive(Clone, Debug)]
 pub struct UpdateAction;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Update {
     pub action: Option<JsValue>,
     pub lane: Lane,
     pub next: Option<Rc<RefCell<Update>>>,
     pub has_eager_state: bool,
     pub eager_state: Option<JsValue>,
+}
+
+impl Debug for Update {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} {:?}", self.action, self.lane)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -88,6 +94,31 @@ pub struct ReturnOfProcessUpdateQueue {
     pub base_queue: Option<Rc<RefCell<Update>>>,
 }
 
+impl Debug for ReturnOfProcessUpdateQueue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "memoized_state:{:?} base_state:{:?}",
+            self.memoized_state, self.base_state
+        );
+
+        if self.base_queue.is_some() {
+            let base_queue = self.base_queue.clone().unwrap();
+            write!(f, " base_queue:{:?}", base_queue);
+            let mut next_option = base_queue.borrow().next.clone();
+            while next_option.is_some() {
+                let next = next_option.clone().unwrap();
+                if Rc::ptr_eq(&next, &base_queue) {
+                    break;
+                }
+                write!(f, "---> {:?}", next);
+                next_option = next.borrow().next.clone();
+            }
+        }
+        Ok(())
+    }
+}
+
 pub fn process_update_queue(
     base_state: Option<MemoizedState>,
     pending_update: Option<Rc<RefCell<Update>>>,
@@ -116,8 +147,9 @@ pub fn process_update_queue(
         loop {
             let mut update = pending.clone().unwrap();
             let update_lane = update.borrow().lane.clone();
+            // log!("update {:?} render_lanes {:?}", update, render_lanes);
             if !is_subset_of_lanes(render_lanes.clone(), update_lane.clone()) {
-                // underpriority
+                // log!("underpriority update {:?}", update);
                 let clone = Rc::new(RefCell::new(create_update(
                     update.borrow().action.clone().unwrap(),
                     update_lane.clone(),
@@ -134,6 +166,7 @@ pub fn process_update_queue(
                     new_base_state = result.memoized_state.clone();
                 } else {
                     new_base_queue_last.clone().unwrap().borrow_mut().next = Some(clone.clone());
+                    new_base_queue_last = Some(clone.clone());
                 }
             } else {
                 if new_base_queue_last.is_some() {
@@ -232,13 +265,13 @@ pub fn process_update_queue(
         if new_base_queue_last.is_none() {
             new_base_state = new_state.clone();
         } else {
-            new_base_queue_last.clone().unwrap().borrow_mut().next = new_base_queue_last.clone();
+            new_base_queue_last.clone().unwrap().borrow_mut().next = new_base_queue_first.clone();
         }
 
         result.memoized_state = new_state;
         result.base_state = new_base_state;
         result.base_queue = new_base_queue_last.clone();
     }
-
+    // log!("result:{:?}", result);
     result
 }

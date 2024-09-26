@@ -9,6 +9,7 @@ use shared::{
 
 use crate::current_dispatcher::CURRENT_DISPATCHER;
 
+pub mod current_batch_config;
 pub mod current_dispatcher;
 mod lazy;
 
@@ -156,6 +157,12 @@ pub unsafe fn use_context(context: &JsValue) -> Result<JsValue, JsValue> {
 pub unsafe fn _use(usable: &JsValue) -> Result<JsValue, JsValue> {
     let _use = &CURRENT_DISPATCHER.current.as_ref().unwrap()._use;
     _use.call1(&JsValue::null(), usable)
+}
+
+#[wasm_bindgen(js_name = useTransition)]
+pub unsafe fn use_transition() -> Result<JsValue, JsValue> {
+    let use_transition = &CURRENT_DISPATCHER.current.as_ref().unwrap().use_transition;
+    use_transition.call0(&JsValue::null())
 }
 
 #[wasm_bindgen(js_name = createContext)]

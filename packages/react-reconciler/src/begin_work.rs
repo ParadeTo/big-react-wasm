@@ -51,7 +51,6 @@ pub fn begin_work(
     work_in_progress: Rc<RefCell<FiberNode>>,
     render_lane: Lane,
 ) -> Result<Option<Rc<RefCell<FiberNode>>>, JsValue> {
-    log!("begin_work {:?}", work_in_progress.clone());
     unsafe {
         DID_RECEIVE_UPDATE = false;
     };
@@ -96,7 +95,7 @@ pub fn begin_work(
         }
     }
 
-    work_in_progress.borrow_mut().lanes = Lane::NoLane;
+    work_in_progress.borrow_mut().lanes -= render_lane.clone();
     // if current.is_some() {
     //     let current = current.clone().unwrap();
     //     current.borrow_mut().lanes = Lane::NoLane;
@@ -280,7 +279,7 @@ fn update_suspense_component(
     let next_primary_children = derive_from_js_value(&next_props, "children");
     let next_fallback_children = derive_from_js_value(&next_props, "fallback");
     push_suspense_handler(work_in_progress.clone());
-    log!("show_fallback {:?}", show_fallback);
+
     if current.is_none() {
         if show_fallback {
             return Some(mount_suspense_fallback_children(
@@ -405,9 +404,6 @@ fn update_function_component(
         render_with_hooks(work_in_progress.clone(), Component, render_lane.clone())?;
 
     let current = { work_in_progress.borrow().alternate.clone() };
-    log!("{:?} {:?}", work_in_progress.clone(), unsafe {
-        DID_RECEIVE_UPDATE
-    });
     if current.is_some() && unsafe { !DID_RECEIVE_UPDATE } {
         bailout_hook(work_in_progress.clone(), render_lane.clone());
         return Ok(bailout_on_already_finished_work(

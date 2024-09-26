@@ -81,7 +81,6 @@ fn trigger_event_flow(paths: Vec<Function>, se: &Event) {
 
 fn dispatch_event(container: &Element, event_type: String, e: &Event) {
     if e.target().is_none() {
-        log!("Target is none");
         return;
     }
 

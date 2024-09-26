@@ -389,11 +389,11 @@ fn reconcile_children_array(
     for (_, fiber) in existing_children {
         delete_child(return_fiber.clone(), fiber, should_track_effects);
     }
-    log!(
-        "first_new_fiber {:?} {:?}",
-        first_new_fiber,
-        first_new_fiber.clone().unwrap().borrow().sibling
-    );
+    // log!(
+    //     "first_new_fiber {:?} {:?}",
+    //     first_new_fiber,
+    //     first_new_fiber.clone().unwrap().borrow().sibling
+    // );
     first_new_fiber
 }
 
